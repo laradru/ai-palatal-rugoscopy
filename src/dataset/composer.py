@@ -39,7 +39,6 @@ class OrderedCompose:
 def join_patches(patches: List[np.ndarray], filenames: List[str]) -> np.ndarray:
     if len(patches) == 0:
         raise ValueError("Input list of patches is empty.")
-
     
     dimensions = [x_y_from_filename(filename) for filename in filenames]
     result_shape = calculate_result_shape_from_patches(patches, dimensions)
