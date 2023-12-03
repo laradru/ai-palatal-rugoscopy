@@ -42,7 +42,7 @@ def join_patches(patches: List[np.ndarray], filenames: List[str]) -> np.ndarray:
     
     dimensions = [x_y_from_filename(filename) for filename in filenames]
     result_shape = calculate_result_shape_from_patches(patches, dimensions)
-    result_image = np.zeros((result_shape[0], result_shape[1]), dtype=np.uint8)
+    result_image = np.zeros(result_shape, dtype=np.uint8)
 
     for (x_result_image, y_result_image), patch in zip(dimensions, patches):
         height, width = patch.shape
@@ -69,8 +69,8 @@ def calculate_result_shape_from_patches(patches: List[np.ndarray], dimensions: T
     return (max_x, max_y)
 
 
-def x_y_from_filename(filename: str) -> tuple[int, int]:
+def x_y_from_filename(filename: str) -> Tuple[int, int]:
     x = int(filename.split("_")[1])
     y = int(filename.split("_")[2].split(".")[0])
     
-    return [x, y]
+    return (x, y)
