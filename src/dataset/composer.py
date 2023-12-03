@@ -70,7 +70,8 @@ def calculate_result_shape_from_patches(patches: List[np.ndarray], dimensions: T
 
 
 def x_y_from_filename(filename: str) -> Tuple[int, int]:
-    x = int(filename.split("_")[1])
-    y = int(filename.split("_")[2].split(".")[0])
+    split_by_underscore = filename.split("_")
+    x = int(split_by_underscore[1])
+    y = int(split_by_underscore[2].split(".")[0])
     
     return (x, y)
