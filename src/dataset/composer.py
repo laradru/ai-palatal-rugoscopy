@@ -3,7 +3,7 @@
 # preprocessing functions.                                                                                            #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List
 
 import numpy as np
 
@@ -34,45 +34,3 @@ class OrderedCompose:
             image, annotations = func(image, annotations, **self.kwargs)
 
         return image, annotations
-
-
-def join_patches(patches: List[np.ndarray], filenames: List[str]) -> np.ndarray:
-    if len(patches) == 0:
-        raise ValueError("Input list of patches is empty.")
-
-    patches_positions = [x_y_from_filename(filename) for filename in filenames]
-    result_shape = calculate_result_shape_from_patches(patches, patches_positions)
-    result_image = np.zeros(result_shape, dtype=np.uint8)
-
-    for (y_at_result_image, x_at_result_image), patch in zip(patches_positions, patches):
-        height, width = patch.shape
-
-        result_image[
-            y_at_result_image:y_at_result_image + height,
-            x_at_result_image:x_at_result_image + width
-        ] = np.maximum(
-            result_image[y_at_result_image:y_at_result_image + height, x_at_result_image:x_at_result_image + width],
-            patch)
-
-    return result_image
-
-
-def calculate_result_shape_from_patches(patches: List[np.ndarray], dimensions: Tuple[int, int]) -> Tuple[int, int]:
-    max_x = 0
-    max_y = 0
-    for (x, y), patch in zip(dimensions, patches):
-        patch_height, patch_width = patch.shape
-        if x + patch_width > max_x:
-            max_x = x + patch_width
-        if y + patch_height > max_y:
-            max_y = y + patch_height
-
-    return (max_x, max_y)
-
-
-def x_y_from_filename(filename: str) -> Tuple[int, int]:
-    split_by_underscore = filename.split("_")
-    x = int(split_by_underscore[1])
-    y = int(split_by_underscore[2].split(".")[0])
-
-    return (x, y)
