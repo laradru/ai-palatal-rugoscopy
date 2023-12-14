@@ -72,7 +72,7 @@ def join_patches(patches: List[np.ndarray], filenames: List[str]) -> np.ndarray:
     if len(patches) == 0:
         raise ValueError("Input list of patches is empty.")
 
-    patches_positions = [x_y_from_filename(filename) for filename in filenames]
+    patches_positions = [x_y_from_filename(filename_from_path(filename)) for filename in filenames]
     result_shape = calculate_result_shape_from_patches(patches, patches_positions)
     result_image = np.zeros(result_shape, dtype=np.uint8)
 
@@ -121,3 +121,17 @@ def x_y_from_filename(filename: str) -> Tuple[int, int]:
     y = int(split_by_underscore[2].split(".")[0])
 
     return (x, y)
+
+def filename_from_path(path: str) -> str:
+    """Extracts filename from a path. Robus enough to receive a filename and
+    return if if not a path.
+    
+    Args:
+        path (str): A path to a file.
+        
+    Returns:
+        str: The extracted filename.
+    """
+    basename = os.path.basename(path)
+    filename, _ = os.path.splitext(basename)
+    return filename
