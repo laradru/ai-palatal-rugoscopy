@@ -71,20 +71,15 @@ def join_patches(patches: List[np.ndarray], filenames: List[str]) -> np.ndarray:
     """
     if len(patches) == 0:
         raise ValueError("Input list of patches is empty.")
-
+    
+    patches = [patch.astype(np.uint8) for patch in patches]
     patches_positions = [x_y_from_filename(filename_from_path(filename)) for filename in filenames]
     result_shape = calculate_result_shape_from_patches(patches, patches_positions)
     result_image = np.zeros(result_shape, dtype=np.uint8)
 
     for (init_y, init_x), patch in zip(patches_positions, patches):
         row, col = patch.shape
-
-        result_image[
-            init_y:init_y + row,
-            init_x:init_x + col
-        ] = np.maximum(
-            result_image[init_y:init_y + row, init_x:init_x + col],
-            patch)
+        result_image[init_y:init_y + row, init_x:init_x + col] |= patch
 
     return result_image
 
