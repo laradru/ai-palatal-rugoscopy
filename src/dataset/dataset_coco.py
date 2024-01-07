@@ -5,18 +5,20 @@
 import os
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import cv2
 import numpy as np
 import torch
+import torchvision.transforms as T
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.dataset.annotations_coco import COCOAnnotations
-from src.dataset.annotations_utils import to_dict
+from src.dataset.annotations_utils import to_dict, xywh_to_xyxy
 from src.dataset.dataset_base import MutableDataset
 from src.dataset.dataset_utils import (
+    custom_collate,
     generate_binary_component,
     generate_binary_mask,
     generate_category_mask,
@@ -57,7 +59,7 @@ class CocoDataset(MutableDataset):
             DataLoader: The DataLoader object.
         """
 
-        return DataLoader(self, batch_size=batch_size, shuffle=shuffle)
+        return DataLoader(self, batch_size=batch_size, shuffle=shuffle, collate_fn=custom_collate)
 
     def split(self, *percentages: float, random: bool) -> Tuple[Any, ...]:
         """Splits the dataset into subsets based on the given percentages.
@@ -180,7 +182,21 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         self.categories = to_dict(self.tree.data["categories"], "id")
         self.annotations = to_dict(self.tree.data.get("annotations"), "image_id")
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Dict]:
+        """Retrieve an item from the dataset.
+
+        Args:
+            idx (int): The index of the item to retrieve.
+
+        Returns:
+            Tuple[torch.Tensor, Dict]: A tuple containing the image tensor and a dictionary of targets.
+                - The image tensor represents the preprocessed input image.
+                - The dictionary of targets contains the following keys:
+                    - "boxes": A list of bounding box coordinates.
+                    - "labels": A list of category labels.
+                    - "masks": A list of instance masks.
+        """
+
         image_data = self.images[idx]
         annotations = self.annotations[image_data["id"]]
         image_path = os.path.join(self.data_directory_path, image_data["file_name"])
@@ -195,13 +211,19 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
             image, annotations = self.augmentations(image, annotations)
 
         # Generate instance masks for each annotation
+        targets = {"boxes": [], "labels": [], "masks": []}
+
         for annotation in annotations:
             mask = generate_binary_component(image, annotation)
-            annotation["mask"] = torch.tensor(mask, dtype=torch.float32)
-            annotation["boxes"] = torch.tensor(annotation["bbox"])
+            targets["masks"].append(mask)
+            targets["boxes"].append(xywh_to_xyxy(annotation["bbox"]))
+            targets["labels"].append(annotation["category_id"])
 
-        image = torch.tensor(image.transpose(2, 0, 1), dtype=torch.float32)  # (H, W, C) -> (C, H, W)
-        return image, annotations
+        targets["masks"] = torch.tensor(np.array(targets["masks"]), dtype=torch.uint8)
+        targets["boxes"] = torch.tensor(np.array(targets["boxes"]), dtype=torch.float64)
+        targets["labels"] = torch.tensor(np.array(targets["labels"]), dtype=torch.int64)
+
+        return T.ToTensor()(image), targets
 
     def __len__(self) -> int:
         """Returns the length of the object.
@@ -297,6 +319,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                             category_id=int(instance_category),
                             bbox=instance_bbox,
                             segmentation=[instance_segmentation],
+                            iscrowd=0,
                         )
 
                         annotation_id += 1

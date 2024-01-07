@@ -162,7 +162,6 @@ def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Tuple[np
     raise StopIteration()
 
 
-@staticmethod
 def join_patches(patches: List[np.ndarray], filenames: List[str]) -> np.ndarray:
     """Joins a list of patches into a single image.
 
@@ -240,3 +239,23 @@ def filename_from_path(path: str) -> str:
     basename = os.path.basename(path)
     filename, _ = os.path.splitext(basename)
     return filename
+
+
+def custom_collate(data):
+    """Collates a list of data instances into separate lists of images and annotations.
+
+    Args:
+        data (list): A list of data instances, where each instance is a tuple containing an image and its annotation.
+
+    Returns:
+        tuple: A tuple containing two lists - the list of images and the list of annotations.
+    """
+
+    imgs = []
+    annotations = []
+
+    for instance in data:
+        imgs.append(instance[0])
+        annotations.append(instance[1])
+
+    return imgs, annotations
