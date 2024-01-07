@@ -22,9 +22,14 @@ class MaskRCNNSegmenter(ArchBase):
         weights_base = torchvision.models.detection.MaskRCNN_ResNet50_FPN_Weights.DEFAULT
         self.model = torchvision.models.detection.mask_rcnn.maskrcnn_resnet50_fpn(weights=weights_base)
 
-        in_features = self.model.roi_heads.box_predictor.cls_score.in_features
-        predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features, num_classes)
-        self.model.roi_heads.box_predictor = predictor
+        in_features_box = self.model.roi_heads.box_predictor.cls_score.in_features
+        in_features_mask = self.model.roi_heads.mask_predictor.conv5_mask.in_channels
+        hidden = 256
+
+        box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features_box, num_classes)
+        mask_predictor = torchvision.models.detection.mask_rcnn.MaskRCNNPredictor(in_features_mask, hidden, num_classes)
+        self.model.roi_heads.box_predictor = box_predictor
+        self.model.roi_heads.mask_predictor = mask_predictor
 
     def forward(self, x: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Forward pass of the model.
