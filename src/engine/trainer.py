@@ -5,6 +5,7 @@
 import torch
 from torch.nn.modules import loss
 from torch.optim import Optimizer
+from tqdm import tqdm
 
 from src.dataset.dataset_base import BaseDataset
 from src.training.tensorboard import TrainingRecorder
@@ -33,32 +34,26 @@ class SupervisedTrainer:
 
         self.model.to(self.device)  # Load model in the GPU
 
-    def train(self, dataset: BaseDataset, optimizer: Optimizer, loss_func: loss) -> float:
+    def train(self, dataset: torch.utils.data.DataLoader, optimizer: Optimizer) -> float:
         """Trains the model on a given dataset.
 
         Args:
-            dataset (BaseDataset): The dataset to train the model on.
+            dataset (torch.utils.data.DataLoader): The dataset to train the model on.
             optimizer (torch.optim.Optimizer): The optimizer used for training.
-            loss_func (torch.nn.modules.loss): The loss function used for training.
 
         Returns:
             float: The average training loss over all batches.
         """
 
         learned_images = 0
-        loss_training = {
-            "loss_classifier": 0,
-            "loss_mask": 0,
-            "loss_box_reg": 0,
-            "loss_objectness": 0,
-            "loss_rpn_box_reg": 0,
-        }
+        loss_train = {}
+        prog_bar = tqdm(total=dataset.sampler.num_samples, ascii=True, unit="images", colour="green")
 
         # Set module status to training. Implemented in torch.nn.Module
         self.model.train()
 
         with torch.set_grad_enabled(True):
-            for n, batch in enumerate(dataset):
+            for batch in dataset:
                 x_pred, y_true = batch
                 x_pred = [x.to(self.device) for x in x_pred]
                 y_true = [{key: yt[key].to(self.device) for key in yt.keys()} for yt in y_true]
@@ -74,15 +69,20 @@ class SupervisedTrainer:
                 loss.backward()  # backpropagation
                 optimizer.step()
 
-                loss_training = {key: loss_training[key] + value for key, value in losses.items()}
-                learned_images += len(x_pred)
-        return {key: loss_training[key] / learned_images for key in loss_training.keys()}
+                loss_train = {key: loss_train[key] + value for key, value in losses.items()} if loss_train else losses
 
-    def evaluate(self, dataset: BaseDataset, loss_func: loss) -> float:
+                learned_images += len(x_pred)
+                prog_bar.n = learned_images
+                prog_bar.refresh()
+
+        prog_bar.close()
+        return {key: loss_train[key] / learned_images for key in loss_train.keys()}
+
+    def evaluate(self, dataset: torch.utils.data.DataLoader) -> float:
         """Calculate the evaluation loss on the given dataset.
 
         Args:
-            dataset (BaseDataset): The dataset to evaluate the model on.
+            dataset (torch.utils.data.DataLoader): The dataset to evaluate the model on.
             loss_func (torch.nn.modules.loss): The loss function to calculate the loss.
 
         Returns:
@@ -90,29 +90,28 @@ class SupervisedTrainer:
         """
 
         images_evaluated = 0
-        loss_validation = {
-            "loss_classifier": 0,
-            "loss_mask": 0,
-            "loss_box_reg": 0,
-            "loss_objectness": 0,
-            "loss_rpn_box_reg": 0,
-        }
+        loss_valid = {}
+        prog_bar = tqdm(total=dataset.sampler.num_samples, ascii=True, unit="images", colour="red")
 
         # Set module status to evalutation. Implemented in torch.nn.Module
         self.model.eval()
 
         with torch.no_grad():
-            for n, batch in enumerate(dataset):
+            for batch in dataset:
                 x_pred, y_true = batch
                 x_pred = [x.to(self.device) for x in x_pred]
                 y_true = [{key: yt[key].to(self.device) for key in yt.keys()} for yt in y_true]
 
                 # Predict
                 losses = self.model(x_pred, y_true)
-                loss_validation = {key: loss_validation[key] + value for key, value in losses.items()}
+                loss_valid = {key: loss_valid[key] + value for key, value in losses.items()} if loss_valid else losses
 
                 images_evaluated += len(x_pred)
-        return {key: loss_validation[key] / images_evaluated for key in loss_validation.keys()}
+                prog_bar.n = images_evaluated
+                prog_bar.refresh()
+
+        prog_bar.close()
+        return {key: loss_valid[key] / images_evaluated for key in loss_valid.keys()}
 
     def fit(
         self,
@@ -138,8 +137,8 @@ class SupervisedTrainer:
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
 
-            loss_training = self.train(training_dataset, optimizer, train_loss)
-            loss_validation = self.evaluate(validation_dataset, validation_loss)
+            loss_training = self.train(training_dataset, optimizer)
+            loss_validation = self.evaluate(validation_dataset)
 
             print(f"Loss training: {loss_training}")
             print(f"Loss validation: {loss_validation}")
