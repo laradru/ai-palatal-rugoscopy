@@ -155,7 +155,7 @@ def train(args: dict) -> None:
     # Start training
     create_training_report(args)
     trainer = SupervisedTrainer(device, model, recorder, seed)
-    trainer.fit(train_loader, validation_loader, optimizer, loss["train"], loss["validation"], epochs)
+    trainer.fit(train_loader, validation_loader, optimizer, epochs)
 
 
 def build_arg_parser() -> ArgumentParser:
