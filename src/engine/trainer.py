@@ -3,11 +3,10 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 import torch
-from torch.nn.modules import loss
 from torch.optim import Optimizer
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.dataset.dataset_base import BaseDataset
 from src.training.tensorboard import TrainingRecorder
 
 
@@ -45,9 +44,9 @@ class SupervisedTrainer:
             float: The average training loss over all batches.
         """
 
-        learned_images = 0
+        total_images = dataset.sampler.num_samples
         loss_train = {}
-        prog_bar = tqdm(total=dataset.sampler.num_samples, ascii=True, unit="images", colour="green")
+        prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="green", desc="Training Phase")
 
         # Set module status to training. Implemented in torch.nn.Module
         self.model.train()
@@ -71,12 +70,11 @@ class SupervisedTrainer:
 
                 loss_train = {key: loss_train[key] + value for key, value in losses.items()} if loss_train else losses
 
-                learned_images += len(x_pred)
-                prog_bar.n = learned_images
+                prog_bar.n += len(x_pred)
                 prog_bar.refresh()
 
         prog_bar.close()
-        return {key: loss_train[key] / learned_images for key in loss_train.keys()}
+        return {key: loss_train[key] / total_images for key in loss_train.keys()}
 
     def evaluate(self, dataset: torch.utils.data.DataLoader) -> float:
         """Calculate the evaluation loss on the given dataset.
@@ -89,12 +87,13 @@ class SupervisedTrainer:
             float: The average validation loss.
         """
 
-        images_evaluated = 0
+        total_images = dataset.sampler.num_samples
         loss_valid = {}
-        prog_bar = tqdm(total=dataset.sampler.num_samples, ascii=True, unit="images", colour="red")
+        prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="red", desc="Validation Phase")
 
-        # Set module status to evalutation. Implemented in torch.nn.Module
-        self.model.eval()
+        # Set module status to train because we want to get the validation loss.
+        # self.model.eval() gives us predictions as model output.
+        self.model.train()
 
         with torch.no_grad():
             for batch in dataset:
@@ -106,39 +105,28 @@ class SupervisedTrainer:
                 losses = self.model(x_pred, y_true)
                 loss_valid = {key: loss_valid[key] + value for key, value in losses.items()} if loss_valid else losses
 
-                images_evaluated += len(x_pred)
-                prog_bar.n = images_evaluated
+                prog_bar.n += len(x_pred)
                 prog_bar.refresh()
 
         prog_bar.close()
-        return {key: loss_valid[key] / images_evaluated for key in loss_valid.keys()}
+        return {key: loss_valid[key] / total_images for key in loss_valid.keys()}
 
-    def fit(
-        self,
-        training_dataset: BaseDataset,
-        validation_dataset: BaseDataset,
-        optimizer: Optimizer,
-        train_loss: loss,
-        validation_loss: loss,
-        epochs: int,
-    ):
+    def fit(self, training_data: DataLoader, validation_data: DataLoader, optimizer: Optimizer, epochs: int):
         """Fits the model to the training dataset and validates it on the validation dataset for a
         specified number of epochs.
 
         Parameters:
-            training_dataset (BaseDataset): The dataset used for training.
-            validation_dataset (BaseDataset): The dataset used for validation.
+            training_data (DataLoader): The dataset used for training.
+            validation_data (DataLoader): The dataset used for validation.
             optimizer (Optimizer): The optimizer used for training.
-            train_loss (loss): The loss function used for training.
-            validation_loss (loss): The loss function used for validation.
             epochs (int): The number of epochs to train the model.
         """
 
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
 
-            loss_training = self.train(training_dataset, optimizer)
-            loss_validation = self.evaluate(validation_dataset)
+            loss_training = self.train(training_data, optimizer)
+            loss_validation = self.evaluate(validation_data)
 
             print(f"Loss training: {loss_training}")
             print(f"Loss validation: {loss_validation}")
