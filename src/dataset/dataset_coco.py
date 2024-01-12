@@ -242,6 +242,10 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
         for image_data in tqdm(self.images):
             image_path = os.path.join(self.data_directory_path, image_data["file_name"])
+            
+            if image_data["id"] not in self.annotations.keys():
+                continue
+            
             image_annotations = self.annotations[image_data["id"]]
 
             image = read_image(image_path)
