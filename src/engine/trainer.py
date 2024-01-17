@@ -2,11 +2,17 @@
 # Core module for training a deep learning model for computer vision tasks                                            #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+import cv2
+import numpy as np
 import torch
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.dataset.annotations_coco import COCOAnnotations
+from src.dataset.dataset_utils import extract_bbox_segmentation
 from src.training.tensorboard import TrainingRecorder
 
 
@@ -81,7 +87,6 @@ class SupervisedTrainer:
 
         Args:
             dataset (torch.utils.data.DataLoader): The dataset to evaluate the model on.
-            loss_func (torch.nn.modules.loss): The loss function to calculate the loss.
 
         Returns:
             float: The average validation loss.
@@ -111,6 +116,46 @@ class SupervisedTrainer:
         prog_bar.close()
         return {key: loss_valid[key] / total_images for key in loss_valid.keys()}
 
+    def coco_eval(self, dataset: torch.utils.data.DataLoader):
+        gt_annotations = COCOAnnotations.from_dict(dataset.dataset.tree.data)
+        pred_annotations = COCOAnnotations.from_dict(dataset.dataset.tree.data)
+        pred_annotations.data["annotations"] = []
+        annotation_id = 1
+
+        self.model.eval()
+        with torch.no_grad():
+            for sample in pred_annotations.data["images"]:
+                image_id = sample["id"] - 1
+                image, __ = dataset.dataset[image_id]
+
+                pred = self.model([image.to(self.device)], None)[0]
+
+                for box, label, mask in zip(pred["boxes"], pred["labels"], pred["masks"]):
+                    mask = mask.cpu().numpy().astype(np.uint8)
+                    mask = np.transpose(mask, (1, 2, 0))
+
+                    if mask.sum() > 0:
+                        __, segmentation = extract_bbox_segmentation(mask)
+                    else:
+                        segmentation = []
+
+                    pred_annotations.add_annotation_instance(
+                        id=annotation_id,
+                        image_id=image_id,
+                        category_id=label.item(),
+                        bbox=box.tolist(),
+                        segmentation=segmentation,
+                    )
+                    annotation_id += 1
+
+        coco_gt = COCO(gt_annotations.data)
+        coco_dt = coco_gt.loadRes(pred_annotations.data)
+
+        evaluator = COCOeval(coco_gt, coco_dt, iouType="bbox")
+        evaluator.evaluate()
+        evaluator.accumulate()
+        evaluator.summarize()
+
     def fit(self, training_data: DataLoader, validation_data: DataLoader, optimizer: Optimizer, epochs: int):
         """Fits the model to the training dataset and validates it on the validation dataset for a
         specified number of epochs.
@@ -125,11 +170,12 @@ class SupervisedTrainer:
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
 
-            loss_training = self.train(training_data, optimizer)
-            loss_validation = self.evaluate(validation_data)
+            # loss_training = self.train(training_data, optimizer)
+            # loss_validation = self.evaluate(validation_data)
+            self.coco_eval(validation_data)
 
-            print(f"Loss training: {loss_training}")
-            print(f"Loss validation: {loss_validation}")
+            # print(f"Loss training: {loss_training}")
+            # print(f"Loss validation: {loss_validation}")
 
             if self.recorder:
                 self.recorder.record_scalar("training loss", loss_training, epoch)
