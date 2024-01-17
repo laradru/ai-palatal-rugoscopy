@@ -19,6 +19,7 @@ from src.dataset.annotations_utils import to_dict, xywh_to_xyxy
 from src.dataset.dataset_base import MutableDataset
 from src.dataset.dataset_utils import (
     custom_collate,
+    extract_bbox_segmentation,
     generate_binary_component,
     generate_binary_mask,
     generate_category_mask,
@@ -304,14 +305,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                     for label in np.unique(patch_map)[1:]:  # 0 is background
                         instance_map = np.array(patch_map == label, dtype=np.uint8)
                         instance_category = patch_category_mask[patch_map == label].max()  # It could also be min().
-                        instance_contours, _ = cv2.findContours(instance_map, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                        instance_bbox = list(cv2.boundingRect(instance_contours[0]))
-
-                        # Now, organize instance segmentation into a list of [x1, y1, x2, y2, x3, y3, ...]
-                        instance_contours = instance_contours[0].reshape(-1, 2).astype(float)
-                        instance_segmentation = [0] * (instance_contours.shape[0] * instance_contours.shape[1])
-                        instance_segmentation[::2] = instance_contours[:, 0]
-                        instance_segmentation[1::2] = instance_contours[:, 1]
+                        instance_bbox, instance_segmentation = extract_bbox_segmentation(instance_map)
 
                         patch_annotations.add_annotation_instance(
                             id=annotation_id,
