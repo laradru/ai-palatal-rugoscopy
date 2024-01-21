@@ -2,7 +2,6 @@
 # A COCO dataset class that should be used with PyTorch.                                                              #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-import math
 import os
 from copy import deepcopy
 from dataclasses import dataclass
