@@ -242,16 +242,16 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
         for image_data in tqdm(self.images):
             image_path = os.path.join(self.data_directory_path, image_data["file_name"])
-            
+
             if image_data["id"] not in self.annotations.keys():
                 continue
-            
+
             image_annotations = self.annotations[image_data["id"]]
 
             image = read_image(image_path)
 
             # ~~ Extend mask dimensions to match with patch_size and stride values.
-            extended_image = np.zeros(extended_dimensions(patch_size, stride, image.shape))
+            extended_image = np.zeros(extended_dimensions(patch_size, stride, image.shape[:2]))
 
             # ~~ Draw components on masks based on the image annotations made on CVAT.
             binary_mask = generate_binary_mask(extended_image, image_annotations)
@@ -320,16 +320,19 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
 def extended_dimensions(patch_size: int, stride: int, image_shape: Tuple[int, ...]) -> Tuple[int, ...]:
     # TODO test cases with strides greater than patch_size
-    return [image_shape[i] if (image_shape[i] - patch_size) % stride == 0 
-                  else (((image_shape[i] // stride) * stride) + patch_size)
-                  for i in range(len(image_shape))]
+    return [
+        image_shape[i]
+        if (image_shape[i] - patch_size) % stride == 0
+        else (((image_shape[i] // stride) * stride) + patch_size)
+        for i in range(len(image_shape))
+    ]
 
     # L = 9; P = 3; S = 4
     # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
     # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
     # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
     # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
-    # X X X X X X X X X  X X X X X X X X X  X X X X X X X X X 
+    # X X X X X X X X X  X X X X X X X X X  X X X X X X X X X
     # Need to add 1 column.
 
     # L = 11; P = 4; S = 3
