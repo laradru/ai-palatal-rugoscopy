@@ -1,6 +1,6 @@
 .PHONY = patch train
 
-CVAT_EXPORT_ROOT = 1
+CVAT_EXPORT_ROOT = "Manual"
 
 PATCH_IMAGES_PATH = ../../data/${CVAT_EXPORT_ROOT}/images
 PATCH_ANNOTATIONS_FILENAME = instances_default.json
