@@ -293,7 +293,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                     # Extract data for each component and create a new annotation instance.
                     for label in np.unique(patch_map)[1:]:  # 0 is background
                         instance_map = np.array(patch_map == label, dtype=np.uint8)
-                        instance_category = mode(patch_category_mask[patch_map == label].flatten(), axis=0)[0][0]
+                        instance_category = mode(patch_category_mask[patch_map == label], axis=None, keepdims=False)[0]
                         instance_contours, _ = cv2.findContours(instance_map, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                         instance_bbox = list(cv2.boundingRect(instance_contours[0]))
 
