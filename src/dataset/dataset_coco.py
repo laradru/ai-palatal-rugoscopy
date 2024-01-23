@@ -212,14 +212,14 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
         return len(self.images)
 
-    def extract_patches(self, output_dir: str, patch_size: int, stride: int, min_area: float) -> None:
+    def extract_patches(self, output_dir: str, patch_size: int, stride: int, min_area_percent: float) -> None:
         """Extracts patches from images and saves them along with their annotations.
 
         Args:
             output_dir (str): The directory where the patches and annotations will be saved.
             patch_size (int): The size of the patches.
             stride (int): The stride between patches.
-            min_area (float): The minimum area required for a patch to be considered.
+            min_area_percent (float): The minimum area percentage (<= 1) for a patch to be considered valid.
         """
 
         # Initialize patch annotations. Categories are the same as the image annotations.
@@ -235,6 +235,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         annotation_id = 1
         images_output_dir = os.path.join(output_dir, "images")
         annotations_output_dir = os.path.join(output_dir, "annotations")
+        min_area = patch_size * patch_size * min_area_percent
 
         # Create output subdirectories.
         os.makedirs(images_output_dir, exist_ok=True)
@@ -242,10 +243,10 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
         for image_data in tqdm(self.images):
             image_path = os.path.join(self.data_directory_path, image_data["file_name"])
-            
+
             if image_data["id"] not in self.annotations.keys():
                 continue
-            
+
             image_annotations = self.annotations[image_data["id"]]
 
             image = read_image(image_path)
@@ -273,19 +274,30 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                         continue
 
                     # ... or with less than min_area
-                    if any([component_size < min_area for component_size in np.bincount(patch_map.flatten())[1:]]):
+                    if any([area < min_area for area in np.bincount(patch_map.flatten())[1:]]):
                         continue
 
                     patch_annotations.add_image_instance(image_id, patch_name, patch_rows, patch_cols)
+
                     patch_category_mask = category_mask[
-                        coord[0] : coord[0] + patch_rows, coord[1] : coord[1] + patch_cols
+                        coord[0] : coord[0] + patch_rows,
+                        coord[1] : coord[1] + patch_cols,
                     ]
-                    patch_image = image[coord[0] : coord[0] + patch_rows, coord[1] : coord[1] + patch_cols]
+
+                    patch_image = image[
+                        coord[0] : coord[0] + patch_rows,
+                        coord[1] : coord[1] + patch_cols,
+                    ]
 
                     # Extract data for each component and create a new annotation instance.
                     for label in np.unique(patch_map)[1:]:  # 0 is background
                         instance_map = np.array(patch_map == label, dtype=np.uint8)
-                        instance_category = patch_category_mask[patch_map == label].max()  # It could also be min().
+                        instance_category = patch_category_mask[patch_map == label][0]  # It could also be min().
+
+                        if instance_category not in [category["id"] for category in self.tree.data["categories"]]:
+                            print(f"Unknown category: {instance_category}")
+                            continue
+
                         instance_contours, _ = cv2.findContours(instance_map, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                         instance_bbox = list(cv2.boundingRect(instance_contours[0]))
 
