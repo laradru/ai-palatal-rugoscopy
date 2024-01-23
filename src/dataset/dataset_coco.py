@@ -10,6 +10,7 @@ from typing import Any, Callable, Tuple
 import cv2
 import numpy as np
 import torch
+from scipy.stats import mode
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -292,12 +293,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                     # Extract data for each component and create a new annotation instance.
                     for label in np.unique(patch_map)[1:]:  # 0 is background
                         instance_map = np.array(patch_map == label, dtype=np.uint8)
-                        instance_category = patch_category_mask[patch_map == label][0]  # It could also be min().
-
-                        if instance_category not in [category["id"] for category in self.tree.data["categories"]]:
-                            print(f"Unknown category: {instance_category}")
-                            continue
-
+                        instance_category = mode(patch_category_mask[patch_map == label].flatten(), axis=0)[0][0]
                         instance_contours, _ = cv2.findContours(instance_map, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                         instance_bbox = list(cv2.boundingRect(instance_contours[0]))
 
