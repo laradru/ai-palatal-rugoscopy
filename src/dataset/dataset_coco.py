@@ -319,38 +319,32 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
 
 def extended_dimensions(patch_size: int, stride: int, image_shape: Tuple[int, ...]) -> Tuple[int, ...]:
-    # TODO test cases with strides greater than patch_size
+    """Calculate the extended dimensions of an image based on the patch size and stride.
+    
+    If for a given dimension, considering the patch_size and the stride, the image will perfectly fit
+    all patches, nothing is done.
+    
+    However, if a dimension doesn't fit patches perfectly, then the dimension is extended in order to
+    guarantee that.
+    
+    The new size of the dimension is calculated by taking the last multiple of stride within the
+    dimension and adding the size of a patch to it. With this operation, this extended dimension
+    now fits patches perfectly considering their size and stride.    
+
+    Args:
+        patch_size (int): The size of the patch.
+        stride (int): The stride between patches.
+        image_shape (Tuple[int, ...]): The shape of the image.
+
+    Returns:
+        Tuple[int, ...]: The extended dimensions of the image.
+
+    """
     return [
         image_shape[i]
+        # do not extend if patches fit perfectly in the image
         if (image_shape[i] - patch_size) % stride == 0
+        # calculate the last multiple of stride + patch_size, which ensures patches fit perfectly.
         else (((image_shape[i] // stride) * stride) + patch_size)
         for i in range(len(image_shape))
     ]
-
-    # L = 9; P = 3; S = 4
-    # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
-    # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
-    # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
-    # o o o o X X X X X  X X X o o o o X X  X X X X X X o o o o
-    # X X X X X X X X X  X X X X X X X X X  X X X X X X X X X
-    # Need to add 1 column.
-
-    # L = 11; P = 4; S = 3
-    # o o o o X X X X X X X  X X X o o o o X X X X  X X X X X X o o o o X  X X X X X X X X X o o o o
-    # o o o o X X X X X X X  X X X o o o o X X X X  X X X X X X o o o o X  X X X X X X X X X o o o o
-    # o o o o X X X X X X X  X X X o o o o X X X X  X X X X X X o o o o X  X X X X X X X X X o o o o
-    # o o o o X X X X X X X  X X X o o o o X X X X  X X X X X X o o o o X  X X X X X X X X X o o o o
-    # X X X X X X X X X X X  X X X X X X X X X X X  X X X X X X X X X X X  X X X X X X X X X X X
-    # Need to add 2 columns.
-
-    # L = 10; P = 4; S = 2
-    # o o o o X X X X X X  X X o o o o X X X X  X X X X o o o o X X  X X X X X X o o o o
-    # o o o o X X X X X X  X X o o o o X X X X  X X X X o o o o X X  X X X X X X o o o o
-    # o o o o X X X X X X  X X o o o o X X X X  X X X X o o o o X X  X X X X X X o o o o
-    # o o o o X X X X X X  X X o o o o X X X X  X X X X o o o o X X  X X X X X X o o o o
-    # X X X X X X X X X X  X X X X X X X X X X  X X X X X X X X X X  X X X X X X X X X X
-    # No need to add columns
-
-    # L = 9; P = 3; S = 2
-    # o o o X X X X X X  X X o o o X X X X  X X X X o o o X X  X X X X o o o X X  X X X X X X o o o
-    # No need to add columns
