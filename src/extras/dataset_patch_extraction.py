@@ -22,10 +22,10 @@ def extract_patches(args: Dict) -> None:
     dataset = CocoDatasetInstanceSegmentation(args.get("images_path"), args.get("annotations_path"))
     patch_size = args.get("patch_size")
     stride = args.get("stride")
-    min_area_ratio = args.get("min_area_ratio")
+    min_area_percentage = args.get("min_area_percentage")
     output_path = args.get("output_path")
 
-    dataset.extract_patches(output_path, patch_size, stride, min_area_ratio)
+    dataset.extract_patches(output_path, patch_size, stride, min_area_percentage)
 
 
 def build_arg_parser() -> ArgumentParser:
@@ -75,9 +75,10 @@ def build_arg_parser() -> ArgumentParser:
     )
 
     parser.add_argument(
-        "--min-area-ratio",
+        "--min-area-percentage",
         type=float,
-        help="Patches with an area smaller than this ratio will be discarded.",
+        help="""Patches with foreground area smaller than min_area_percentage pixels in the patch will be discarded.
+            Defaults to 0.05.""",
         default=0.05,
         required=False,
     )
