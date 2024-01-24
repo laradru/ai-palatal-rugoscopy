@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 import torch
 import torchvision.transforms as T
+from scipy.stats import mode
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -235,14 +236,14 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
         return len(self.images)
 
-    def extract_patches(self, output_dir: str, patch_size: int, stride: int, min_area: float) -> None:
+    def extract_patches(self, output_dir: str, patch_size: int, stride: int, min_area_percent: float) -> None:
         """Extracts patches from images and saves them along with their annotations.
 
         Args:
             output_dir (str): The directory where the patches and annotations will be saved.
             patch_size (int): The size of the patches.
             stride (int): The stride between patches.
-            min_area (float): The minimum area required for a patch to be considered.
+            min_area_percent (float): The minimum area percentage (<= 1) for a patch to be considered valid.
         """
 
         # Initialize patch annotations. Categories are the same as the image annotations.
@@ -258,6 +259,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         annotation_id = 1
         images_output_dir = os.path.join(output_dir, "images")
         annotations_output_dir = os.path.join(output_dir, "annotations")
+        min_area = patch_size * patch_size * min_area_percent
 
         # Create output subdirectories.
         os.makedirs(images_output_dir, exist_ok=True)
@@ -265,13 +267,19 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
         for image_data in tqdm(self.images):
             image_path = os.path.join(self.data_directory_path, image_data["file_name"])
-            image_annotations = self.annotations[image_data["id"]]
 
+            if image_data["id"] not in self.annotations.keys():
+                continue
+
+            image_annotations = self.annotations[image_data["id"]]
             image = read_image(image_path)
 
+            # ~~ Extend mask dimensions to match with patch_size and stride values.
+            extended_image = np.zeros(extended_dimensions(patch_size, stride, image.shape[:2]))
+
             # ~~ Draw components on masks based on the image annotations made on CVAT.
-            binary_mask = generate_binary_mask(image, image_annotations)
-            category_mask = generate_category_mask(image, image_annotations)
+            binary_mask = generate_binary_mask(extended_image, image_annotations)
+            category_mask = generate_category_mask(extended_image, image_annotations)
             __, component_mask = cv2.connectedComponents(binary_mask)
 
             # ~~ Extract patches
@@ -292,19 +300,25 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                         continue
 
                     # ... or with less than min_area
-                    if any([component_size < min_area for component_size in np.bincount(patch_map.flatten())[1:]]):
+                    if any([area < min_area for area in np.bincount(patch_map.flatten())[1:]]):
                         continue
 
                     patch_annotations.add_image_instance(image_id, patch_name, patch_rows, patch_cols)
+
                     patch_category_mask = category_mask[
-                        coord[0] : coord[0] + patch_rows, coord[1] : coord[1] + patch_cols
+                        coord[0] : coord[0] + patch_rows,
+                        coord[1] : coord[1] + patch_cols,
                     ]
-                    patch_image = image[coord[0] : coord[0] + patch_rows, coord[1] : coord[1] + patch_cols]
+
+                    patch_image = image[
+                        coord[0] : coord[0] + patch_rows,
+                        coord[1] : coord[1] + patch_cols,
+                    ]
 
                     # Extract data for each component and create a new annotation instance.
                     for label in np.unique(patch_map)[1:]:  # 0 is background
                         instance_map = np.array(patch_map == label, dtype=np.uint8)
-                        instance_category = patch_category_mask[patch_map == label].max()  # It could also be min().
+                        instance_category = mode(patch_category_mask[patch_map == label], axis=None, keepdims=False)[0]
                         instance_bbox, instance_segmentation = extract_bbox_segmentation(instance_map)
 
                         patch_annotations.add_annotation_instance(
@@ -325,3 +339,35 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                 pass
 
         patch_annotations.save(output_path=os.path.join(output_dir, "annotations", "annotations.json"))
+
+
+def extended_dimensions(patch_size: int, stride: int, image_shape: Tuple[int, ...]) -> Tuple[int, ...]:
+    """Calculate the extended dimensions of an image based on the patch size and stride.
+
+    If for a given dimension, considering the patch_size and the stride, the image will perfectly fit
+    all patches, nothing is done.
+
+    However, if a dimension doesn't fit patches perfectly, then the dimension is extended in order to
+    guarantee that.
+
+    The new size of the dimension is calculated by taking the last multiple of stride within the
+    dimension and adding the size of a patch to it. With this operation, this extended dimension
+    now fits patches perfectly considering their size and stride.
+
+    Args:
+        patch_size (int): The size of the patch.
+        stride (int): The stride between patches.
+        image_shape (Tuple[int, ...]): The shape of the image.
+
+    Returns:
+        Tuple[int, ...]: The extended dimensions of the image.
+
+    """
+    return [
+        image_shape[i]
+        # do not extend if patches fit perfectly in the image
+        if (image_shape[i] - patch_size) % stride == 0
+        # calculate the last multiple of stride + patch_size, which ensures patches fit perfectly.
+        else (((image_shape[i] // stride) * stride) + patch_size)
+        for i in range(len(image_shape))
+    ]
