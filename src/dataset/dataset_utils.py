@@ -129,6 +129,7 @@ def generate_category_mask(image: np.ndarray, annotations: Dict) -> np.ndarray:
 
 def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Tuple[np.ndarray, Tuple[int, int]]:
     """Generate patches from an image using a sliding window approach.
+    Patch size is fixed. Patches that would be smaller are filled with zeros.
 
     Args:
         image (np.ndarray): The input image.
@@ -148,7 +149,11 @@ def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Tuple[np
 
     while cur_row < rows:
         coord = (cur_row, cur_col)
-        patch = image[cur_row : min(cur_row + patch_size, rows - 1), cur_col : min(cur_col + patch_size, cols - 1)]
+
+        patch = np.zeros((patch_size, patch_size), dtype=image.dtype)
+        patch_rows = min(patch_size, rows - cur_row)
+        patch_cols = min(patch_size, cols - cur_col)
+        patch[:patch_rows, :patch_cols] = image[cur_row:cur_row + patch_rows, cur_col:cur_col + patch_cols]
 
         if cur_col + patch_size >= cols - 1:
             previous_was_inside = cur_row - stride + patch_size < rows - 1

@@ -252,9 +252,12 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
             image = read_image(image_path)
 
+            # ~~ Extend mask dimensions to match with patch_size and stride values.
+            extended_image = np.zeros(extended_dimensions(patch_size, stride, image.shape[:2]))
+
             # ~~ Draw components on masks based on the image annotations made on CVAT.
-            binary_mask = generate_binary_mask(image, image_annotations)
-            category_mask = generate_category_mask(image, image_annotations)
+            binary_mask = generate_binary_mask(extended_image, image_annotations)
+            category_mask = generate_category_mask(extended_image, image_annotations)
             __, component_mask = cv2.connectedComponents(binary_mask)
 
             # ~~ Extract patches
@@ -309,6 +312,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                             category_id=int(instance_category),
                             bbox=instance_bbox,
                             segmentation=[instance_segmentation],
+                            iscrowd=0,
                         )
 
                         annotation_id += 1
@@ -320,3 +324,35 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                 pass
 
         patch_annotations.save(output_path=os.path.join(output_dir, "annotations", "annotations.json"))
+
+
+def extended_dimensions(patch_size: int, stride: int, image_shape: Tuple[int, ...]) -> Tuple[int, ...]:
+    """Calculate the extended dimensions of an image based on the patch size and stride.
+    
+    If for a given dimension, considering the patch_size and the stride, the image will perfectly fit
+    all patches, nothing is done.
+    
+    However, if a dimension doesn't fit patches perfectly, then the dimension is extended in order to
+    guarantee that.
+    
+    The new size of the dimension is calculated by taking the last multiple of stride within the
+    dimension and adding the size of a patch to it. With this operation, this extended dimension
+    now fits patches perfectly considering their size and stride.    
+
+    Args:
+        patch_size (int): The size of the patch.
+        stride (int): The stride between patches.
+        image_shape (Tuple[int, ...]): The shape of the image.
+
+    Returns:
+        Tuple[int, ...]: The extended dimensions of the image.
+
+    """
+    return [
+        image_shape[i]
+        # do not extend if patches fit perfectly in the image
+        if (image_shape[i] - patch_size) % stride == 0
+        # calculate the last multiple of stride + patch_size, which ensures patches fit perfectly.
+        else (((image_shape[i] // stride) * stride) + patch_size)
+        for i in range(len(image_shape))
+    ]
