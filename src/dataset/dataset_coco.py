@@ -219,7 +219,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
             mask = generate_binary_component(image, annotation)
             targets["masks"].append(mask)
             targets["boxes"].append(xywh_to_xyxy(annotation["bbox"]))
-            targets["labels"].append(annotation["category_id"])
+            targets["labels"].append(annotation["category_id"] - 1)
 
         targets["masks"] = torch.tensor(np.array(targets["masks"]), dtype=torch.uint8)
         targets["boxes"] = torch.tensor(np.array(targets["boxes"]), dtype=torch.float64)

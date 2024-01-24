@@ -44,8 +44,15 @@ class SupervisedTrainer:
             float: The average training loss over all batches.
         """
 
+        loss_train = {
+            "loss_classifier": 0,
+            "loss_box_reg": 0,
+            "loss_mask": 0,
+            "loss_objectness": 0,
+            "loss_rpn_box_reg": 0,
+        }
+
         total_images = dataset.sampler.num_samples
-        loss_train = {}
         prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="green", desc="Training Phase")
 
         # Set module status to training. Implemented in torch.nn.Module
@@ -68,7 +75,7 @@ class SupervisedTrainer:
                 loss.backward()  # backpropagation
                 optimizer.step()
 
-                loss_train = {key: loss_train[key] + value for key, value in losses.items()} if loss_train else losses
+                loss_train = {key: loss_train[key] + value.item() for key, value in losses.items()}
 
                 prog_bar.n += len(x_pred)
                 prog_bar.refresh()
@@ -86,8 +93,15 @@ class SupervisedTrainer:
             float: The average validation loss.
         """
 
+        loss_valid = {
+            "loss_classifier": 0,
+            "loss_box_reg": 0,
+            "loss_mask": 0,
+            "loss_objectness": 0,
+            "loss_rpn_box_reg": 0,
+        }
+
         total_images = dataset.sampler.num_samples
-        loss_valid = {}
         prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="red", desc="Validation Phase")
 
         # Set module status to train because we want to get the validation loss.
