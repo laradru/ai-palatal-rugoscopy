@@ -116,7 +116,7 @@ class SupervisedTrainer:
 
                 # Predict
                 losses = self.model(x_pred, y_true)
-                loss_valid = {key: loss_valid[key] + value for key, value in losses.items()} if loss_valid else losses
+                loss_valid = {key: loss_valid[key] + value.item() for key, value in losses.items()}
 
                 prog_bar.n += len(x_pred)
                 prog_bar.refresh()
