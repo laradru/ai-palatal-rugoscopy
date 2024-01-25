@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from src.training.tensorboard import TrainingRecorder
 
+main_metric = "loss_classifier"
 
 class SupervisedTrainer:
     def __init__(self, device: str, model: torch.nn.Module, recorder: TrainingRecorder = None, seed: int = None):
@@ -33,7 +34,7 @@ class SupervisedTrainer:
 
         self.model.to(self.device)  # Load model in the GPU
 
-    def train(self, dataset: torch.utils.data.DataLoader, optimizer: Optimizer) -> float:
+    def train(self, dataset: torch.utils.data.DataLoader, optimizer: Optimizer) -> dict:
         """Trains the model on a given dataset.
 
         Args:
@@ -45,7 +46,7 @@ class SupervisedTrainer:
         """
 
         loss_train = {
-            "loss_classifier": 0,
+            main_metric: 0,
             "loss_box_reg": 0,
             "loss_mask": 0,
             "loss_objectness": 0,
@@ -83,7 +84,7 @@ class SupervisedTrainer:
         prog_bar.close()
         return {key: loss_train[key] / total_images for key in loss_train.keys()}
 
-    def evaluate(self, dataset: torch.utils.data.DataLoader) -> float:
+    def evaluate(self, dataset: torch.utils.data.DataLoader) -> dict:
         """Calculate the evaluation loss on the given dataset.
 
         Args:
@@ -94,7 +95,7 @@ class SupervisedTrainer:
         """
 
         loss_valid = {
-            "loss_classifier": 0,
+            main_metric: 0,
             "loss_box_reg": 0,
             "loss_mask": 0,
             "loss_objectness": 0,
@@ -145,12 +146,12 @@ class SupervisedTrainer:
             print(f"Loss validation: {loss_validation}")
 
             if self.recorder:
-                self.recorder.record_scalar("training loss", loss_training, epoch)
-                self.recorder.record_scalar("validation loss", loss_validation, epoch)
+                self.recorder.record_scalars("training loss", loss_training, epoch)
+                self.recorder.record_scalars("validation loss", loss_validation, epoch)
 
             # Save checkpoint.
-            if loss_validation < self.best_loss:
-                self.best_loss = loss_validation
+            if loss_validation[main_metric] < self.best_loss:
+                self.best_loss = loss_validation[main_metric]
                 self.model.save()
 
         if self.recorder:
