@@ -52,3 +52,20 @@ def to_dict(data: List[Dict], key_type: str) -> Dict:
         data_dictionary[key] = list(group)
 
     return data_dictionary
+
+
+def xywh_to_xyxy(bbox: List) -> List:
+    """Converts a bounding box in the format [x, y, w, h] to [x1, y1, x2, y2].
+
+    Args:
+        bbox (List): The bounding box in the format [x, y, w, h].
+    Returns:
+        List: The bounding box in the format [x1, y1, x2, y2].
+    """
+
+    x, y, w, h = bbox
+
+    x2 = x + w
+    y2 = y + h
+
+    return [x, y, x2, y2]

@@ -3,10 +3,10 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 import torch
-from torch.nn.modules import loss
 from torch.optim import Optimizer
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-from src.dataset.dataset_base import BaseDataset
 from src.training.tensorboard import TrainingRecorder
 
 
@@ -21,6 +21,7 @@ class SupervisedTrainer:
             seed (int, optional): The seed to use for reproducibility. Defaults to None.
         """
 
+        self.main_metric = "loss_mask"
         self.device = device
         self.model = model
         self.recorder = recorder  # Tensorboard recorder to track training progress.
@@ -33,121 +34,124 @@ class SupervisedTrainer:
 
         self.model.to(self.device)  # Load model in the GPU
 
-    def train(self, dataset: BaseDataset, optimizer: Optimizer, loss_func: loss, verbose: bool = False) -> float:
+    def train(self, dataset: torch.utils.data.DataLoader, optimizer: Optimizer) -> dict:
         """Trains the model on a given dataset.
 
         Args:
-            dataset (BaseDataset): The dataset to train the model on.
+            dataset (torch.utils.data.DataLoader): The dataset to train the model on.
             optimizer (torch.optim.Optimizer): The optimizer used for training.
-            loss_func (torch.nn.modules.loss): The loss function used for training.
-            verbose (bool, optional): Whether to print the training loss for each batch. Defaults to False.
 
         Returns:
             float: The average training loss over all batches.
         """
 
-        loss_training = 0
+        loss_train = {
+            "loss_classifier": 0,
+            "loss_box_reg": 0,
+            "loss_mask": 0,
+            "loss_objectness": 0,
+            "loss_rpn_box_reg": 0,
+        }
+
+        total_images = dataset.sampler.num_samples
+        prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="green", desc="Training Phase")
 
         # Set module status to training. Implemented in torch.nn.Module
         self.model.train()
 
         with torch.set_grad_enabled(True):
-            for n, batch in enumerate(dataset):
+            for batch in dataset:
                 x_pred, y_true = batch
-                x_pred = x_pred.to(self.device)
+                x_pred = [x.to(self.device) for x in x_pred]
+                y_true = [{key: yt[key].to(self.device) for key in yt.keys()} for yt in y_true]
 
                 # Zero gradients for each batch
                 optimizer.zero_grad()
 
                 # Predict
-                y_pred = self.model(x_pred, y_true)
+                losses = self.model(x_pred, y_true)
 
                 # Loss computation and weights correction
-                loss = loss_func(y_pred, y_true)
+                loss = sum(loss for loss in losses.values())
                 loss.backward()  # backpropagation
                 optimizer.step()
 
-                loss_value = loss.item()
-                loss_training += loss_value
+                loss_train = {key: loss_train[key] + value.item() for key, value in losses.items()}
 
-                if verbose:
-                    print(f"Training loss: {loss_value}")
+                prog_bar.n += len(x_pred)
+                prog_bar.refresh()
 
-        return loss_training / n
+        prog_bar.close()
+        return {key: loss_train[key] / total_images for key in loss_train.keys()}
 
-    def evaluate(self, dataset: BaseDataset, loss_func: loss, verbose: bool = False) -> float:
+    def evaluate(self, dataset: torch.utils.data.DataLoader) -> dict:
         """Calculate the evaluation loss on the given dataset.
 
         Args:
-            dataset (BaseDataset): The dataset to evaluate the model on.
-            loss_func (torch.nn.modules.loss): The loss function to calculate the loss.
-            verbose (bool, optional): Whether to print the validation loss. Defaults to False.
+            dataset (torch.utils.data.DataLoader): The dataset to evaluate the model on.
 
         Returns:
             float: The average validation loss.
         """
 
-        loss_validation = 0
+        loss_valid = {
+            "loss_classifier": 0,
+            "loss_box_reg": 0,
+            "loss_mask": 0,
+            "loss_objectness": 0,
+            "loss_rpn_box_reg": 0,
+        }
 
-        # Set module status to evalutation. Implemented in torch.nn.Module
-        self.model.eval()
+        total_images = dataset.sampler.num_samples
+        prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="red", desc="Validation Phase")
+
+        # Set module status to train because we want to get the validation loss.
+        # self.model.eval() gives us predictions as model output.
+        self.model.train()
 
         with torch.no_grad():
-            for n, batch in enumerate(dataset):
+            for batch in dataset:
                 x_pred, y_true = batch
-                x_pred, y_true = x_pred.to(self.device), y_true.to(self.device)
+                x_pred = [x.to(self.device) for x in x_pred]
+                y_true = [{key: yt[key].to(self.device) for key in yt.keys()} for yt in y_true]
 
                 # Predict
-                y_pred = self.model(x_pred)
+                losses = self.model(x_pred, y_true)
+                loss_valid = {key: loss_valid[key] + value.item() for key, value in losses.items()}
 
-                loss = loss_func(y_pred, y_true)
-                loss_value = loss.item()
-                loss_validation += loss_value
+                prog_bar.n += len(x_pred)
+                prog_bar.refresh()
 
-                if verbose:
-                    print(f"Validation loss {loss_value}")
+        prog_bar.close()
+        return {key: loss_valid[key] / total_images for key in loss_valid.keys()}
 
-        return loss_validation / n
-
-    def fit(
-        self,
-        training_dataset: BaseDataset,
-        validation_dataset: BaseDataset,
-        optimizer: Optimizer,
-        train_loss: loss,
-        validation_loss: loss,
-        epochs: int,
-        verbose: bool = False,
-    ):
+    def fit(self, training_data: DataLoader, validation_data: DataLoader, optimizer: Optimizer, epochs: int):
         """Fits the model to the training dataset and validates it on the validation dataset for a
         specified number of epochs.
 
         Parameters:
-            training_dataset (BaseDataset): The dataset used for training.
-            validation_dataset (BaseDataset): The dataset used for validation.
+            training_data (DataLoader): The dataset used for training.
+            validation_data (DataLoader): The dataset used for validation.
             optimizer (Optimizer): The optimizer used for training.
-            train_loss (loss): The loss function used for training.
-            validation_loss (loss): The loss function used for validation.
             epochs (int): The number of epochs to train the model.
-            verbose (bool, optional): Whether to print training progress. Defaults to False.
         """
 
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
 
-            loss_training = self.train(training_dataset, optimizer, train_loss, verbose)
-            loss_validation = self.evaluate(validation_dataset, validation_loss, verbose)
+            loss_training = self.train(training_data, optimizer)
+            loss_validation = self.evaluate(validation_data)
 
             print(f"Loss training: {loss_training}")
             print(f"Loss validation: {loss_validation}")
 
             if self.recorder:
-                self.recorder.record_scalar("training loss", loss_training, epoch)
-                self.recorder.record_scalar("validation loss", loss_validation, epoch)
+                self.recorder.record_scalars("training loss", loss_training, epoch)
+                self.recorder.record_scalars("validation loss", loss_validation, epoch)
 
             # Save checkpoint.
-            if loss_validation < self.best_loss:
-                self.best_loss = loss_validation
+            if loss_validation[self.main_metric] < self.best_loss:
+                self.best_loss = loss_validation[self.main_metric]
                 self.model.save()
 
         if self.recorder:

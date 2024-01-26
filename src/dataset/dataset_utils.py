@@ -127,6 +127,31 @@ def generate_category_mask(image: np.ndarray, annotations: Dict) -> np.ndarray:
     return category_mask
 
 
+def extract_bbox_segmentation(instance_mask: np.ndarray) -> Tuple[List[int], List[float]]:
+    """
+    Extracts the bounding box and segmentation of an instance mask.
+
+    Args:
+        instance_mask (np.ndarray): The instance mask to extract the bounding box and segmentation from.
+
+    Returns:
+        Tuple[List[int], List[float]]: A tuple containing the instance bounding box and segmentation.
+            The instance bounding box is a list of integers representing [x, y, width, height].
+            The instance segmentation is a list of floats representing [x1, y1, x2, y2, x3, y3, ...].
+    """
+
+    instance_contours, _ = cv2.findContours(instance_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    instance_bbox = list(cv2.boundingRect(instance_contours[0]))
+
+    # Now, organize instance segmentation into a list of [x1, y1, x2, y2, x3, y3, ...]
+    instance_contours = instance_contours[0].reshape(-1, 2).astype(float)
+    instance_segmentation = [0] * (instance_contours.shape[0] * instance_contours.shape[1])
+    instance_segmentation[::2] = instance_contours[:, 0]
+    instance_segmentation[1::2] = instance_contours[:, 1]
+
+    return instance_bbox, instance_segmentation
+
+
 def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Tuple[np.ndarray, Tuple[int, int]]:
     """Generate patches from an image using a sliding window approach.
     Patch size is fixed. Patches that would be smaller are filled with zeros.
@@ -167,7 +192,6 @@ def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Tuple[np
     raise StopIteration()
 
 
-@staticmethod
 def join_patches(patches: List[np.ndarray], filenames: List[str]) -> np.ndarray:
     """Joins a list of patches into a single image.
 
@@ -245,3 +269,23 @@ def filename_from_path(path: str) -> str:
     basename = os.path.basename(path)
     filename, _ = os.path.splitext(basename)
     return filename
+
+
+def custom_collate(data):
+    """Collates a list of data instances into separate lists of images and annotations.
+
+    Args:
+        data (list): A list of data instances, where each instance is a tuple containing an image and its annotation.
+
+    Returns:
+        tuple: A tuple containing two lists - the list of images and the list of annotations.
+    """
+
+    imgs = []
+    annotations = []
+
+    for instance in data:
+        imgs.append(instance[0])
+        annotations.append(instance[1])
+
+    return imgs, annotations

@@ -143,7 +143,6 @@ def train(args: dict) -> None:
     output_path = args.get("output_path")
     learning_rate = args.get("learning_rate")
     epochs = args.get("epochs")
-    loss = {"train": torch.nn.BCELoss(), "validation": torch.nn.BCELoss()}
     device = torch.device("cuda") if args.get("gpu") and torch.cuda.is_available() else torch.device("cpu")
     recorder = TrainingRecorder(f"{output_path}/training_{datetime.now().__str__()}")
 
@@ -155,7 +154,7 @@ def train(args: dict) -> None:
     # Start training
     create_training_report(args)
     trainer = SupervisedTrainer(device, model, recorder, seed)
-    trainer.fit(train_loader, validation_loader, optimizer, loss["train"], loss["validation"], epochs, verbose=False)
+    trainer.fit(train_loader, validation_loader, optimizer, epochs)
 
 
 def build_arg_parser() -> ArgumentParser:

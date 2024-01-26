@@ -5,19 +5,22 @@
 import os
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import cv2
 import numpy as np
 import torch
+import torchvision.transforms as T
 from scipy.stats import mode
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.dataset.annotations_coco import COCOAnnotations
-from src.dataset.annotations_utils import to_dict
+from src.dataset.annotations_utils import to_dict, xywh_to_xyxy
 from src.dataset.dataset_base import MutableDataset
 from src.dataset.dataset_utils import (
+    custom_collate,
+    extract_bbox_segmentation,
     generate_binary_component,
     generate_binary_mask,
     generate_category_mask,
@@ -58,7 +61,7 @@ class CocoDataset(MutableDataset):
             DataLoader: The DataLoader object.
         """
 
-        return DataLoader(self, batch_size=batch_size, shuffle=shuffle)
+        return DataLoader(self, batch_size=batch_size, shuffle=shuffle, collate_fn=custom_collate)
 
     def split(self, *percentages: float, random: bool) -> Tuple[Any, ...]:
         """Splits the dataset into subsets based on the given percentages.
@@ -181,7 +184,21 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         self.categories = to_dict(self.tree.data["categories"], "id")
         self.annotations = to_dict(self.tree.data.get("annotations"), "image_id")
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Dict]:
+        """Retrieve an item from the dataset.
+
+        Args:
+            idx (int): The index of the item to retrieve.
+
+        Returns:
+            Tuple[torch.Tensor, Dict]: A tuple containing the image tensor and a dictionary of targets.
+                - The image tensor represents the preprocessed input image.
+                - The dictionary of targets contains the following keys:
+                    - "boxes": A list of bounding box coordinates.
+                    - "labels": A list of category labels.
+                    - "masks": A list of instance masks.
+        """
+
         image_data = self.images[idx]
         annotations = self.annotations[image_data["id"]]
         image_path = os.path.join(self.data_directory_path, image_data["file_name"])
@@ -196,13 +213,19 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
             image, annotations = self.augmentations(image, annotations)
 
         # Generate instance masks for each annotation
+        targets = {"boxes": [], "labels": [], "masks": []}
+
         for annotation in annotations:
             mask = generate_binary_component(image, annotation)
-            annotation["mask"] = torch.tensor(mask, dtype=torch.float32)
-            annotation["boxes"] = torch.tensor(annotation["bbox"])
+            targets["masks"].append(mask)
+            targets["boxes"].append(xywh_to_xyxy(annotation["bbox"]))
+            targets["labels"].append(annotation["category_id"] - 1)
 
-        image = torch.tensor(image.transpose(2, 0, 1), dtype=torch.float32)  # (H, W, C) -> (C, H, W)
-        return image, annotations
+        targets["masks"] = torch.tensor(np.array(targets["masks"]), dtype=torch.uint8)
+        targets["boxes"] = torch.tensor(np.array(targets["boxes"]), dtype=torch.float64)
+        targets["labels"] = torch.tensor(np.array(targets["labels"]), dtype=torch.int64)
+
+        return T.ToTensor()(image), targets
 
     def __len__(self) -> int:
         """Returns the length of the object.
@@ -249,7 +272,6 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                 continue
 
             image_annotations = self.annotations[image_data["id"]]
-
             image = read_image(image_path)
 
             # ~~ Extend mask dimensions to match with patch_size and stride values.
@@ -297,14 +319,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                     for label in np.unique(patch_map)[1:]:  # 0 is background
                         instance_map = np.array(patch_map == label, dtype=np.uint8)
                         instance_category = mode(patch_category_mask[patch_map == label], axis=None, keepdims=False)[0]
-                        instance_contours, _ = cv2.findContours(instance_map, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-                        instance_bbox = list(cv2.boundingRect(instance_contours[0]))
-
-                        # Now, organize instance segmentation into a list of [x1, y1, x2, y2, x3, y3, ...]
-                        instance_contours = instance_contours[0].reshape(-1, 2).astype(float)
-                        instance_segmentation = [0] * (instance_contours.shape[0] * instance_contours.shape[1])
-                        instance_segmentation[::2] = instance_contours[:, 0]
-                        instance_segmentation[1::2] = instance_contours[:, 1]
+                        instance_bbox, instance_segmentation = extract_bbox_segmentation(instance_map)
 
                         patch_annotations.add_annotation_instance(
                             id=annotation_id,
@@ -328,16 +343,16 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
 def extended_dimensions(patch_size: int, stride: int, image_shape: Tuple[int, ...]) -> Tuple[int, ...]:
     """Calculate the extended dimensions of an image based on the patch size and stride.
-    
+
     If for a given dimension, considering the patch_size and the stride, the image will perfectly fit
     all patches, nothing is done.
-    
+
     However, if a dimension doesn't fit patches perfectly, then the dimension is extended in order to
     guarantee that.
-    
+
     The new size of the dimension is calculated by taking the last multiple of stride within the
     dimension and adding the size of a patch to it. With this operation, this extended dimension
-    now fits patches perfectly considering their size and stride.    
+    now fits patches perfectly considering their size and stride.
 
     Args:
         patch_size (int): The size of the patch.

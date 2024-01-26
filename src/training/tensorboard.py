@@ -17,16 +17,17 @@ class TrainingRecorder:
         self.summary_filepath = summary_filepath
         self.writer = SummaryWriter(self.summary_filepath)
 
-    def record_scalar(self, tag: str, value: float, step=None) -> None:
+    def record_scalars(self, tag: str, values: dict, step=None) -> None:
         """Record a scalar value for the given tag at the specified step.
 
         Args:
             tag (str): The tag to identify the scalar value.
-            value (float): The scalar value to record.
+            value (dict): The  dict of values to record.
             step (Optional[int]): The step at which to record the scalar value. Defaults to None.
         """
 
-        self.writer.add_scalar(tag, value, step)
+        for key, value in values.items():
+            self.writer.add_scalar(f'{tag}_{key}', value, step)
 
     def record_image(self, tag: str, image: torch.Tensor, step=None) -> None:
         """Records an image with a given tag and adds it to the writer.
