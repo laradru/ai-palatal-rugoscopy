@@ -21,6 +21,7 @@ class SupervisedTrainer:
             seed (int, optional): The seed to use for reproducibility. Defaults to None.
         """
 
+        self.main_metric = "loss_mask"
         self.device = device
         self.model = model
         self.recorder = recorder  # Tensorboard recorder to track training progress.
@@ -33,7 +34,7 @@ class SupervisedTrainer:
 
         self.model.to(self.device)  # Load model in the GPU
 
-    def train(self, dataset: torch.utils.data.DataLoader, optimizer: Optimizer) -> float:
+    def train(self, dataset: torch.utils.data.DataLoader, optimizer: Optimizer) -> dict:
         """Trains the model on a given dataset.
 
         Args:
@@ -83,7 +84,7 @@ class SupervisedTrainer:
         prog_bar.close()
         return {key: loss_train[key] / total_images for key in loss_train.keys()}
 
-    def evaluate(self, dataset: torch.utils.data.DataLoader) -> float:
+    def evaluate(self, dataset: torch.utils.data.DataLoader) -> dict:
         """Calculate the evaluation loss on the given dataset.
 
         Args:
@@ -145,12 +146,12 @@ class SupervisedTrainer:
             print(f"Loss validation: {loss_validation}")
 
             if self.recorder:
-                self.recorder.record_scalar("training loss", loss_training, epoch)
-                self.recorder.record_scalar("validation loss", loss_validation, epoch)
+                self.recorder.record_scalars("training loss", loss_training, epoch)
+                self.recorder.record_scalars("validation loss", loss_validation, epoch)
 
             # Save checkpoint.
-            if loss_validation < self.best_loss:
-                self.best_loss = loss_validation
+            if loss_validation[self.main_metric] < self.best_loss:
+                self.best_loss = loss_validation[self.main_metric]
                 self.model.save()
 
         if self.recorder:
