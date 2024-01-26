@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 from src.training.tensorboard import TrainingRecorder
 
-main_metric = "loss_classifier"
 
 class SupervisedTrainer:
     def __init__(self, device: str, model: torch.nn.Module, recorder: TrainingRecorder = None, seed: int = None):
@@ -22,6 +21,7 @@ class SupervisedTrainer:
             seed (int, optional): The seed to use for reproducibility. Defaults to None.
         """
 
+        self.main_metric = "loss_mask"
         self.device = device
         self.model = model
         self.recorder = recorder  # Tensorboard recorder to track training progress.
@@ -46,7 +46,7 @@ class SupervisedTrainer:
         """
 
         loss_train = {
-            main_metric: 0,
+            "loss_classifier": 0,
             "loss_box_reg": 0,
             "loss_mask": 0,
             "loss_objectness": 0,
@@ -95,7 +95,7 @@ class SupervisedTrainer:
         """
 
         loss_valid = {
-            main_metric: 0,
+            "loss_classifier": 0,
             "loss_box_reg": 0,
             "loss_mask": 0,
             "loss_objectness": 0,
@@ -150,8 +150,8 @@ class SupervisedTrainer:
                 self.recorder.record_scalars("validation loss", loss_validation, epoch)
 
             # Save checkpoint.
-            if loss_validation[main_metric] < self.best_loss:
-                self.best_loss = loss_validation[main_metric]
+            if loss_validation[self.main_metric] < self.best_loss:
+                self.best_loss = loss_validation[self.main_metric]
                 self.model.save()
 
         if self.recorder:

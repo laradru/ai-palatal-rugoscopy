@@ -26,7 +26,8 @@ class TrainingRecorder:
             step (Optional[int]): The step at which to record the scalar value. Defaults to None.
         """
 
-        [self.writer.add_scalar(f'{tag}_{key}', value, step) for key, value in values.items()]
+        for key, value in values.items():
+            self.writer.add_scalar(f'{tag}_{key}', value, step)
 
     def record_image(self, tag: str, image: torch.Tensor, step=None) -> None:
         """Records an image with a given tag and adds it to the writer.
