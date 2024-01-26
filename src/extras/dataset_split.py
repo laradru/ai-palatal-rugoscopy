@@ -42,7 +42,7 @@ def main(args: Dict) -> None:
     coco_dataset = CocoDatasetInstanceSegmentation(data_directory_path=None, data_annotation_path=annotations_path)
     datasets = coco_dataset.split(*splits, random=True)
 
-    os.path.makedirs(output_path, exist_ok=True)
+    os.makedirs(output_path, exist_ok=True)
 
     for dataset, label in zip(datasets, split_labels):
         dataset.tree.save(os.path.join(output_path, f"{label}_annotations.json"))
@@ -67,14 +67,14 @@ def build_arg_parser() -> ArgumentParser:
     parser.add_argument(
         "--output-path",
         type=str,
-        help="Path to the output file.",
+        help="Path to the output folder.",
         required=True,
     )
 
     parser.add_argument(
         "--split",
         type=float,
-        help="Split percentage.",
+        help="Split percentage, e.g. 0.8 0.2.",
         nargs="+",
         required=True,
     )

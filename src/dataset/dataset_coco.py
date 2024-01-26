@@ -316,7 +316,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         assert np.sum([*percentages]) == 1, "Summation of percentages must be equal to 1."
 
         subsets = []
-        all_images_ids = [img["id"] for img in self.images if len(self.annotations[img["id"]]) > 0]
+        all_images_ids = [img["id"] for img in self.images if self.annotations.get(img["id"]) is not None and len(self.annotations[img["id"]]) > 0]
 
         total_images = len(all_images_ids)
         subset_sizes = [int(total_images * perc) for perc in percentages]
