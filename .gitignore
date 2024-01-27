@@ -135,3 +135,6 @@ datasets/
 
 # vscode folder
 .vscode
+
+# Ignore data folder
+data/**
