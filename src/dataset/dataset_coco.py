@@ -316,7 +316,11 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         assert np.sum([*percentages]) == 1, "Summation of percentages must be equal to 1."
 
         subsets = []
-        all_images_ids = [img["id"] for img in self.images if self.annotations.get(img["id"]) is not None and len(self.annotations[img["id"]]) > 0]
+        all_images_ids = [
+            img["id"]
+            for img in self.images
+            if self.annotations.get(img["id"]) is not None and len(self.annotations[img["id"]]) > 0
+        ]
 
         total_images = len(all_images_ids)
         subset_sizes = [int(total_images * perc) for perc in percentages]
@@ -334,8 +338,8 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
             subset.images = to_dict(subset.tree.data["images"], "id")
 
             image_annotations = to_dict(subset.tree.data["annotations"], "image_id")
-            subset.tree.data["annotations"] = [image_annotations[image_id][0] for image_id in subset.images.keys()]
-            subset.tree.data["annotations"] = np.array(subset.tree.data["annotations"]).flatten().tolist()
+            subset.tree.data["annotations"] = [image_annotations[image_id] for image_id in subset.images.keys()]
+            subset.tree.data["annotations"] = [item for sublist in subset.tree.data["annotations"] for item in sublist]
             subset.annotations = subset.tree.data.get("annotations")
 
             subsets.append(subset)
