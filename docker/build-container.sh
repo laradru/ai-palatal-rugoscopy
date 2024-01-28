@@ -38,4 +38,5 @@ docker run -it \
     --volume $data_path:/home/$USER/data \
     --hostname $hostname \
     --name $container_name \
+    -p 9092:6000 \
     $image_name

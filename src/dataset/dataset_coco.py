@@ -63,44 +63,6 @@ class CocoDataset(MutableDataset):
 
         return DataLoader(self, batch_size=batch_size, shuffle=shuffle, collate_fn=custom_collate)
 
-    def split(self, *percentages: float, random: bool) -> Tuple[Any, ...]:
-        """Splits the dataset into subsets based on the given percentages.
-
-        Args:
-            *percentages (float): The percentages to split the dataset into subsets. The sum of percentages must be
-            equal to 1.
-            random (bool): Determines whether to shuffle the images before splitting.
-        Returns:
-            Tuple: A tuple of subsets, each containing a portion of the dataset.
-        """
-
-        assert np.sum([*percentages]) == 1, "Summation of percentages must be equal to 1."
-
-        subsets = []
-        all_images = list(self.images.keys())
-        total_images = len(all_images)
-        subset_sizes = [int(total_images * perc) for perc in percentages]
-
-        if random:
-            np.random.shuffle(all_images)
-
-        for ss in subset_sizes:
-            subset = deepcopy(self)
-            indexes = all_images[:ss]
-
-            subset.tree.data["images"] = [self.images[i][0] for i in indexes]
-            subset.images = to_dict(subset.tree.data["images"], "id")
-
-            image_annotations = to_dict(subset.tree.data["annotations"], "image_id")
-            subset.tree.data["annotations"] = [image_annotations[image_id][0] for image_id in subset.images.keys()]
-            subset.tree.data["annotations"] = np.array(subset.tree.data["annotations"]).flatten().tolist()
-            subset.annotations = subset.tree.data.get("annotations")
-
-            subsets.append(subset)
-            all_images = all_images[ss:]
-
-        return tuple(subsets)
-
     def preview_dataset(self) -> None:
         """Prints a preview of the dataset by displaying some dataset statistics."""
 
@@ -339,6 +301,51 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                 pass
 
         patch_annotations.save(output_path=os.path.join(output_dir, "annotations", "annotations.json"))
+
+    def split(self, *percentages: float, random: bool) -> Tuple[Any, ...]:
+        """Splits the dataset into subsets based on the given percentages.
+
+        Args:
+            *percentages (float): The percentages to split the dataset into subsets. The sum of percentages must be
+            equal to 1.
+            random (bool): Determines whether to shuffle the images before splitting.
+        Returns:
+            Tuple: A tuple of subsets, each containing a portion of the dataset.
+        """
+
+        assert np.sum([*percentages]) == 1, "Summation of percentages must be equal to 1."
+
+        subsets = []
+        all_images_ids = [
+            img["id"]
+            for img in self.images
+            if self.annotations.get(img["id"]) is not None and len(self.annotations[img["id"]]) > 0
+        ]
+
+        total_images = len(all_images_ids)
+        subset_sizes = [int(total_images * perc) for perc in percentages]
+
+        if random:
+            np.random.shuffle(all_images_ids)
+
+        for ss in subset_sizes:
+            subset = deepcopy(self)
+            indexes = all_images_ids[:ss]
+
+            subset.tree.data["images"] = [
+                self.images[j] for i in indexes for j in range(len(self.images)) if self.images[j]["id"] == i
+            ]
+            subset.images = to_dict(subset.tree.data["images"], "id")
+
+            image_annotations = to_dict(subset.tree.data["annotations"], "image_id")
+            subset.tree.data["annotations"] = [image_annotations[image_id] for image_id in subset.images.keys()]
+            subset.tree.data["annotations"] = [item for sublist in subset.tree.data["annotations"] for item in sublist]
+            subset.annotations = subset.tree.data.get("annotations")
+
+            subsets.append(subset)
+            all_images_ids = all_images_ids[ss:]
+
+        return tuple(subsets)
 
 
 def extended_dimensions(patch_size: int, stride: int, image_shape: Tuple[int, ...]) -> Tuple[int, ...]:
