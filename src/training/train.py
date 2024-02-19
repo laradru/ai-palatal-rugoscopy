@@ -143,6 +143,7 @@ def train(args: dict) -> None:
     output_path = args.get("output_path")
     learning_rate = args.get("learning_rate")
     epochs = args.get("epochs")
+    coco_eval_frequency = args.get("coco_eval_frequency")
     device = torch.device("cuda") if args.get("gpu") and torch.cuda.is_available() else torch.device("cpu")
     recorder = TrainingRecorder(f"{output_path}/training_{datetime.now().__str__()}")
 
@@ -154,7 +155,7 @@ def train(args: dict) -> None:
     # Start training
     create_training_report(args)
     trainer = SupervisedTrainer(device, model, recorder, seed)
-    trainer.fit(train_loader, validation_loader, optimizer, epochs)
+    trainer.fit(train_loader, validation_loader, optimizer, epochs, coco_eval_frequency=coco_eval_frequency)
 
 
 def build_arg_parser() -> ArgumentParser:
@@ -220,6 +221,13 @@ def build_arg_parser() -> ArgumentParser:
         type=float,
         help="Learning rate",
         default=0.001,
+    )
+
+    parser.add_argument(
+        "--coco-eval-frequency",
+        type=int,
+        help="COCO evaluation frequency in number of epochs",
+        default=10,
     )
 
     parser.add_argument(
