@@ -144,6 +144,7 @@ class SupervisedTrainer:
         pred_annotations = COCOAnnotations.from_dict(dataset.dataset.tree.data)
         pred_annotations.data["annotations"] = []
         annotation_id = 1
+        min_number_of_points = 8
 
         total_images = dataset.sampler.num_samples
         prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="yellow", desc="COCO Evaluation Phase")
@@ -157,20 +158,26 @@ class SupervisedTrainer:
                 pred = self.model([image.to(self.device)], None)[0]
 
                 for box, label, mask, score in zip(pred["boxes"], pred["labels"], pred["masks"], pred["scores"]):
-                    mask = mask.cpu().numpy().astype(np.uint8)
+                    mask = mask.detach().cpu().numpy()
                     mask = np.transpose(mask, (1, 2, 0))
+                    mask[mask > 0.5] = 1
+                    mask[mask < 1] = 0
+                    mask = mask.astype(np.uint8)
 
                     if mask.sum() == 0:
                         continue
 
                     __, segmentation = extract_bbox_segmentation(mask)
 
+                    if len(segmentation) < min_number_of_points:
+                        continue
+
                     pred_annotations.add_annotation_instance(
                         id=annotation_id,
                         image_id=image_id,
                         category_id=label.item(),
-                        bbox=box.tolist(),
-                        segmentation=segmentation,
+                        bbox=box.detach().cpu().numpy().astype(int).tolist(),
+                        segmentation=[segmentation],
                         score=score.item(),
                         area=len(mask[mask > 0]),
                         iscrowd=0,
