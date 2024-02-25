@@ -3,7 +3,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, Generator, List, Tuple
 
 import cv2
 import numpy as np
@@ -144,7 +144,7 @@ def extract_bbox_segmentation(instance_mask: np.ndarray) -> Tuple[List[int], Lis
     instance_bbox = list(cv2.boundingRect(instance_contours[0]))
 
     # Now, organize instance segmentation into a list of [x1, y1, x2, y2, x3, y3, ...]
-    instance_contours = instance_contours[0].reshape(-1, 2).astype(float)
+    instance_contours = instance_contours[0].reshape(-1, 2).astype(int)
     instance_segmentation = [0] * (instance_contours.shape[0] * instance_contours.shape[1])
     instance_segmentation[::2] = instance_contours[:, 0]
     instance_segmentation[1::2] = instance_contours[:, 1]
@@ -152,7 +152,7 @@ def extract_bbox_segmentation(instance_mask: np.ndarray) -> Tuple[List[int], Lis
     return instance_bbox, instance_segmentation
 
 
-def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Tuple[np.ndarray, Tuple[int, int]]:
+def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Generator:
     """Generate patches from an image using a sliding window approach.
     Patch size is fixed. Patches that would be smaller are filled with zeros.
 
@@ -162,23 +162,24 @@ def patch_generator(image: np.ndarray, patch_size: int, stride: int) -> Tuple[np
         stride (int): The stride between patches.
 
     Yields:
-        Tuple[np.ndarray, Tuple[int, int]]: A tuple containing the patch and its coordinates.
+        Generator[np.ndarray, Tuple[int, int]]: A generator that yields a patch and its coordinates.
 
     Raises:
-        GeneratorExit: Raised when generator is closed.
+        StopIteration: Raised when generator is closed.
     """
 
     rows, cols = image.shape[:2]
+    patch_shape = (patch_size, patch_size, image.shape[2]) if image.ndim > 2 else (patch_size, patch_size)
     cur_row = 0
     cur_col = 0
 
     while cur_row < rows:
         coord = (cur_row, cur_col)
 
-        patch = np.zeros((patch_size, patch_size), dtype=image.dtype)
+        patch = np.zeros(patch_shape, dtype=image.dtype)
         patch_rows = min(patch_size, rows - cur_row)
         patch_cols = min(patch_size, cols - cur_col)
-        patch[:patch_rows, :patch_cols] = image[cur_row:cur_row + patch_rows, cur_col:cur_col + patch_cols]
+        patch[:patch_rows, :patch_cols] = image[cur_row : cur_row + patch_rows, cur_col : cur_col + patch_cols]
 
         if cur_col + patch_size >= cols - 1:
             previous_was_inside = cur_row - stride + patch_size < rows - 1

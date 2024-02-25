@@ -1,0 +1,34 @@
+{
+    "categories": [
+        {
+            "id": 1,
+            "name": "Straight",
+            "supercategory": ""
+        },
+        {
+            "id": 2,
+            "name": "Curved",
+            "supercategory": ""
+        },
+        {
+            "id": 3,
+            "name": "Circular",
+            "supercategory": ""
+        },
+        {
+            "id": 4,
+            "name": "Ramified",
+            "supercategory": ""
+        },
+        {
+            "id": 5,
+            "name": "Sinuous",
+            "supercategory": ""
+        },
+        {
+            "id": 6,
+            "name": "Other",
+            "supercategory": ""
+        }
+    ]
+}

@@ -1,10 +1,11 @@
 from typing import Dict, List, Tuple
 
+import cv2
 import numpy as np
 import torch
 
 from src.architectures.segmenter_maskrcnn import MaskRCNNSegmenter
-from src.dataset.dataset_utils import join_patches, patch_generator
+from src.dataset.dataset_utils import extract_bbox_segmentation, join_patches, patch_generator
 
 
 class MaskRCNNPrediction:
@@ -136,3 +137,29 @@ class MaskRCNNPrediction:
             category_images[c] = join_patches(category_patches[c], patch_names)
 
         return category_images
+
+    @staticmethod
+    def to_cvat(category_images: Dict) -> List[Dict]:
+        """Convert predictions to a format compatible with CVAT.
+
+        Args:
+            category_images (Dict): A dictionary containing category IDs as keys and segmentation maps as values.
+        Returns:
+            List[Dict]: A list of dictionaries containing confidence, label, points, and type for each category image.
+        """
+
+        response = []
+        smallest_ob_size = 10
+
+        for category_id, segmentation_map in category_images.items():
+            if np.any(segmentation_map > 0):
+                __, components_map = cv2.connectedComponents(segmentation_map)
+                components_id, counts = np.unique(components_map, return_counts=True)[0:]
+
+                for component_id, count in zip(components_id, counts):
+                    if count < smallest_ob_size:
+                        continue
+
+                    __, segmentation = extract_bbox_segmentation(components_map == component_id)
+                    response.append({"confidence": 1, "label": category_id, "points": segmentation, "type": "polygon"})
+        return response
