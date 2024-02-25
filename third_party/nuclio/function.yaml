@@ -5,8 +5,22 @@ metadata:
   name: palatal-rugoscopy-annotator
   namespace: cvat
 
+  annotations:
+    name: Mask R-CNN
+    type: interactor
+    framework: pytorch
+    spec: |
+      [
+        { "id":  1, "name": "Straight" },
+        { "id":  2, "name": "Curved" },
+        { "id":  3, "name": "Circular" },
+        { "id":  4, "name": "Ramified" },
+        { "id":  5, "name": "Sinuous" },
+        { "id":  6, "name": "Other" }
+      ]
+
 spec:
-  desc: "A Mask R-CNN model trained for automatic annotations of palatal rugae on CVAT."
+  description: "A Mask R-CNN model trained for automatic annotations of palatal rugae on CVAT."
   runtime: "python:3.10"
   handler: main:handler
   eventTimeout: 30s
@@ -25,12 +39,20 @@ spec:
           value: /opt/nuclio
 
   triggers:
-    http:
-      kind: http
+    myHttpTrigger:
+      maxWorkers: 1
+      kind: 'http'
+      workerAvailabilityTimeoutMilliseconds: 10000
       attributes:
-        serviceType: NodePort
-    periodic:
-      attributes:
-        interval: 3s
-      class: ""
-      kind: cron
+        maxRequestBodySize: 33554432 # 32MB
+  
+  platform:
+    attributes:
+      restartPolicy:
+        name: always
+        maximumRetryCount: 3
+      mountMode: volume
+  
+  resources:
+    limits:
+      nvidia.com/gpu: 1
