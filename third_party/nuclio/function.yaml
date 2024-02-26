@@ -7,7 +7,7 @@ metadata:
 
   annotations:
     name: Mask R-CNN
-    type: interactor
+    type: detector
     framework: pytorch
     spec: |
       [
