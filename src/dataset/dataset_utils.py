@@ -127,7 +127,7 @@ def generate_category_mask(image: np.ndarray, annotations: Dict) -> np.ndarray:
     return category_mask
 
 
-def extract_bbox_segmentation(instance_mask: np.ndarray) -> Tuple[List[int], List[float]]:
+def extract_bbox_segmentation(instance_mask: np.ndarray) -> Tuple[List[int], List[int]]:
     """
     Extracts the bounding box and segmentation of an instance mask.
 
@@ -135,9 +135,9 @@ def extract_bbox_segmentation(instance_mask: np.ndarray) -> Tuple[List[int], Lis
         instance_mask (np.ndarray): The instance mask to extract the bounding box and segmentation from.
 
     Returns:
-        Tuple[List[int], List[float]]: A tuple containing the instance bounding box and segmentation.
+        Tuple[List[int], List[int]]: A tuple containing the instance bounding box and segmentation.
             The instance bounding box is a list of integers representing [x, y, width, height].
-            The instance segmentation is a list of floats representing [x1, y1, x2, y2, x3, y3, ...].
+            The instance segmentation is a list of integers representing [x1, y1, x2, y2, x3, y3, ...].
     """
 
     instance_contours, _ = cv2.findContours(instance_mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)

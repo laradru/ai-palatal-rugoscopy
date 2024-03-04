@@ -14,6 +14,7 @@ CATEGORIES_FILEPATH = "categories.json"
 PATCH_SIZE = 256
 STRIDE = 128
 DEVICE = "cuda:0"
+BATCH_SIZE = 10
 
 
 def init_context(context):
@@ -27,6 +28,8 @@ def init_context(context):
 
 
 def handler(context: Context, event: Event) -> Context.Response:
+    context.logger.info("Starting automatic annotation...")
+
     data = event.body
     buffer = io.BytesIO(base64.b64decode(data["image"]))  # Image to be annotated.
     threshold = float(data.get("threshold", 0.5))  # Defined on CVAT interface.
@@ -34,8 +37,10 @@ def handler(context: Context, event: Event) -> Context.Response:
     image = np.array(Image.open(buffer))
     predictor: MaskRCNNPrediction = context.user_data.model
 
-    results = predictor.predict_image(image, threshold)
+    results = predictor.predict_image(image, BATCH_SIZE, threshold)
     results = predictor.to_cvat(results)
+
+    context.logger.info("Finished automatic annotation")
 
     return context.Response(
         body=json.dumps(results),
