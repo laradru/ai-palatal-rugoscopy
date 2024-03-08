@@ -2,11 +2,16 @@
 # Core module for training a deep learning model for computer vision tasks                                            #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
+import numpy as np
 import torch
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.dataset.annotations_coco import COCOAnnotations
+from src.dataset.dataset_utils import extract_bbox_segmentation
 from src.training.tensorboard import TrainingRecorder
 
 
@@ -125,7 +130,71 @@ class SupervisedTrainer:
         prog_bar.close()
         return {key: loss_valid[key] / total_images for key in loss_valid.keys()}
 
-    def fit(self, training_data: DataLoader, validation_data: DataLoader, optimizer: Optimizer, epochs: int):
+    def coco_eval(self, dataset: torch.utils.data.DataLoader) -> None:
+        """Performs COCO evaluation using ground truth and predicted annotations.
+
+        Args:
+            dataset (torch.utils.data.DataLoader): The dataset containing ground truth annotations.
+
+        Returns:
+            None
+        """
+
+        gt_annotations = COCOAnnotations.from_dict(dataset.dataset.tree.data)
+        pred_annotations = COCOAnnotations.from_dict(dataset.dataset.tree.data)
+        pred_annotations.data["annotations"] = []
+        annotation_id = 1
+
+        total_images = dataset.sampler.num_samples
+        prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="yellow", desc="COCO Evaluation Phase")
+
+        self.model.eval()
+        with torch.no_grad():
+            for sample in pred_annotations.data["images"]:
+                image_id = sample["id"]
+                image, __ = dataset.dataset[image_id - 1]
+
+                pred = self.model([image.to(self.device)], None)[0]
+
+                for box, label, mask, score in zip(pred["boxes"], pred["labels"], pred["masks"], pred["scores"]):
+                    mask = mask.cpu().numpy().astype(np.uint8)
+                    mask = np.transpose(mask, (1, 2, 0))
+
+                    if mask.sum() == 0:
+                        continue
+
+                    __, segmentation = extract_bbox_segmentation(mask)
+
+                    pred_annotations.add_annotation_instance(
+                        id=annotation_id,
+                        image_id=image_id,
+                        category_id=label.item(),
+                        bbox=box.tolist(),
+                        segmentation=segmentation,
+                        score=score.item(),
+                        area=len(mask[mask > 0]),
+                        iscrowd=0,
+                    )
+                    annotation_id += 1
+
+                prog_bar.n += 1
+                prog_bar.refresh()
+        prog_bar.close()
+
+        coco_ground_truth = COCO()
+        coco_ground_truth.dataset = gt_annotations.data
+        coco_ground_truth.createIndex()
+
+        coco_detection = COCO()
+        coco_detection.dataset = pred_annotations.data
+        coco_detection.createIndex()
+
+        evaluator = COCOeval(coco_ground_truth, coco_detection, iouType="segm")
+        evaluator.evaluate()
+        evaluator.accumulate()
+        evaluator.summarize()
+
+    def fit(self, training_data: DataLoader, validation_data: DataLoader, optimizer: Optimizer, epochs: int, **kwargs):
         """Fits the model to the training dataset and validates it on the validation dataset for a
         specified number of epochs.
 
@@ -136,11 +205,16 @@ class SupervisedTrainer:
             epochs (int): The number of epochs to train the model.
         """
 
+        coco_eval_frequency = kwargs.get("coco_eval_frequency", None)
+
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
 
             loss_training = self.train(training_data, optimizer)
             loss_validation = self.evaluate(validation_data)
+
+            if coco_eval_frequency is not None and epoch % coco_eval_frequency == 0:
+                self.coco_eval(validation_data)
 
             print(f"Loss training: {loss_training}")
             print(f"Loss validation: {loss_validation}")
