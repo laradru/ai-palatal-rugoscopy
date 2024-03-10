@@ -21,8 +21,9 @@ PATCH_ANNOTATIONS_VALIDATION_FILENAME = validation_annotations.json
 PATCH_ANNOTATIONS_VALIDATION_PATH = ${DATA_ROOT}/${CVAT_EXPORT_ROOT}/output/${PATCH_ANNOTATIONS_VALIDATION_FILENAME}
 PATCH_TRAINING_OUTPUT_PATH = ${DATA_ROOT}/${CVAT_EXPORT_ROOT}/output/patches/training
 PATCH_VALIDATION_OUTPUT_PATH = ${DATA_ROOT}/${CVAT_EXPORT_ROOT}/output/patches/validation
+PATCH_RESIZE_IMAGE_WIDTH = 1024
 PATCH_SIZE = 256
-PATCH_STRIDE = 128
+PATCH_STRIDE = 16
 
 patch:
 	python -m src.extras.dataset_patch_extraction \
@@ -30,13 +31,15 @@ patch:
     --annotations-path ${PATCH_ANNOTATIONS_TRAINING_PATH} \
     --output-path ${PATCH_TRAINING_OUTPUT_PATH} \
     --patch-size ${PATCH_SIZE} \
-    --stride ${PATCH_STRIDE} && \
+    --stride ${PATCH_STRIDE} \
+    --resize-image-width ${PATCH_RESIZE_IMAGE_WIDTH} && \
     python -m src.extras.dataset_patch_extraction \
     --images-path ${PATCH_IMAGES_PATH} \
     --annotations-path ${PATCH_ANNOTATIONS_VALIDATION_PATH} \
     --output-path ${PATCH_VALIDATION_OUTPUT_PATH} \
     --patch-size ${PATCH_SIZE} \
-    --stride ${PATCH_STRIDE}
+    --stride ${PATCH_STRIDE} \
+    --resize-image-width ${PATCH_RESIZE_IMAGE_WIDTH}
     
 
 TRAIN_TRAINING_IMAGES_PATH = ${DATA_ROOT}/${CVAT_EXPORT_ROOT}/output/patches/training/images

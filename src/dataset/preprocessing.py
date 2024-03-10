@@ -56,3 +56,20 @@ class CocoPreprocessing:
             return cv2.resize(image, size), annotations
         else:
             raise ArgumentError("Size is not specified.")
+
+    @staticmethod
+    def resize_with_factor(image: np.ndarray, annotations: Dict, **kwargs: Dict) -> Tuple[np.ndarray, Dict]:
+        """Resize the input image and annotations by a given factor.
+
+        Args:
+            image (np.ndarray): The input image to be resized.
+            annotations (Dict): The annotations associated with the image.
+            **kwargs (Dict): Additional keyword arguments.
+                resize_factor (float): The factor by which the image and annotations should be resized.
+
+        Returns:
+            Tuple[np.ndarray, Dict]: The resized image and updated annotations.
+        """
+
+        factor = kwargs["resize_factor"]
+        return cv2.resize(image, None, fx=factor, fy=factor), annotations
