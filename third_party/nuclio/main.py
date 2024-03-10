@@ -14,7 +14,7 @@ CATEGORIES_FILEPATH = "categories.json"
 PATCH_SIZE = 256
 STRIDE = 128
 DEVICE = "cuda:0"
-BATCH_SIZE = 10
+BATCH_SIZE = 8
 
 
 def init_context(context):

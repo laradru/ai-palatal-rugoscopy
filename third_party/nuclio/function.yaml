@@ -23,7 +23,7 @@ spec:
   description: "A Mask R-CNN model trained for automatic annotations of palatal rugae on CVAT."
   runtime: "python:3.10"
   handler: main:handler
-  eventTimeout: 30s
+  eventTimeout: 600s
   
   build:
     image: cvat/ai-palatal-rugoscopy-annotator
@@ -44,7 +44,7 @@ spec:
       kind: 'http'
       workerAvailabilityTimeoutMilliseconds: 10000
       attributes:
-        maxRequestBodySize: 33554432 # 32MB
+        maxRequestBodySize: 67108864 # 64MB
   
   platform:
     attributes:
