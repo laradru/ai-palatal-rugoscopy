@@ -10,6 +10,7 @@ from src.architectures.segmenter_maskrcnn import MaskRCNNSegmenter
 from src.dataset.augmentations import Augmentations
 from src.dataset.composer import OrderedCompose
 from src.dataset.dataset_coco import CocoDatasetInstanceSegmentation
+from src.dataset.preprocessing import CocoPreprocessing
 from src.engine.trainer import SupervisedTrainer
 from src.training.tensorboard import TrainingRecorder
 
@@ -115,7 +116,7 @@ def train(args: dict) -> None:
     preprocessing_funcs, augmentations_funcs = None, None
 
     if args.get("preprocess"):
-        preprocessing_funcs = None
+        preprocessing_funcs = OrderedCompose([CocoPreprocessing.resize_to_target], resize_target=1024)
     if args.get("augment"):
         augmentations_funcs = OrderedCompose([Augmentations.augment])
 

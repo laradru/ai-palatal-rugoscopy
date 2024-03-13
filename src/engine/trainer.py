@@ -151,9 +151,10 @@ class SupervisedTrainer:
 
         self.model.eval()
         with torch.no_grad():
-            for sample in pred_annotations.data["images"]:
+            for i in range(len(pred_annotations.data["images"])):
+                sample = pred_annotations.data["images"][i]
                 image_id = sample["id"]
-                image, __ = dataset.dataset[image_id - 1]
+                image, __ = dataset.dataset[i]
 
                 pred = self.model([image.to(self.device)], None)[0]
 
