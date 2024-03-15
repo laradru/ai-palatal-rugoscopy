@@ -235,6 +235,7 @@ class SupervisedTrainer:
             if loss_validation[self.main_metric] < self.best_loss:
                 self.best_loss = loss_validation[self.main_metric]
                 self.model.save()
+                print(f"Model weights updated with {self.main_metric} = {self.best_loss}")
 
         if self.recorder:
             self.recorder.close()
