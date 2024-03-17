@@ -6,22 +6,22 @@ import numpy as np
 import torch
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.architectures.arch_base import ArchBase
 from src.dataset.annotations_coco import COCOAnnotations
 from src.dataset.dataset_utils import extract_bbox_segmentation
 from src.training.tensorboard import TrainingRecorder
 
 
 class SupervisedTrainer:
-    def __init__(self, device: str, model: torch.nn.Module, recorder: TrainingRecorder = None, seed: int = None):
+    def __init__(self, device: str, model: ArchBase, recorder: TrainingRecorder = None, seed: int = None):
         """Class constructor. Initializes the trainer module for supervised learning.
 
         Args:
             device (str): The device to use for training (e.g., 'cuda' or 'cpu').
-            model (torch.nn.Module): The model to be trained.
+            model (ArchBase): The model to be trained.
             recorder (TrainingRecorder, optional): A training recorder to track training progress. Defaults to None.
             seed (int, optional): The seed to use for reproducibility. Defaults to None.
         """
@@ -29,6 +29,7 @@ class SupervisedTrainer:
         self.main_metric = "loss_mask"
         self.device = device
         self.model = model
+        self.optimizer = model.optimizer
         self.recorder = recorder  # Tensorboard recorder to track training progress.
         self.best_loss = 1e20  # Set to a large value, so that the first validation loss is always better.
 
@@ -39,7 +40,7 @@ class SupervisedTrainer:
 
         self.model.to(self.device)  # Load model in the GPU
 
-    def train(self, dataset: torch.utils.data.DataLoader, optimizer: Optimizer) -> dict:
+    def train(self, dataset: torch.utils.data.DataLoader) -> dict:
         """Trains the model on a given dataset.
 
         Args:
@@ -58,7 +59,7 @@ class SupervisedTrainer:
             "loss_rpn_box_reg": 0,
         }
 
-        total_images = dataset.sampler.num_samples
+        total_images = len(dataset.sampler.data_source.images)
         prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="green", desc="Training Phase")
 
         # Set module status to training. Implemented in torch.nn.Module
@@ -71,7 +72,7 @@ class SupervisedTrainer:
                 y_true = [{key: yt[key].to(self.device) for key in yt.keys()} for yt in y_true]
 
                 # Zero gradients for each batch
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
 
                 # Predict
                 losses = self.model(x_pred, y_true)
@@ -79,7 +80,7 @@ class SupervisedTrainer:
                 # Loss computation and weights correction
                 loss = sum(loss for loss in losses.values())
                 loss.backward()  # backpropagation
-                optimizer.step()
+                self.optimizer.step()
 
                 loss_train = {key: loss_train[key] + value.item() for key, value in losses.items()}
 
@@ -107,7 +108,7 @@ class SupervisedTrainer:
             "loss_rpn_box_reg": 0,
         }
 
-        total_images = dataset.sampler.num_samples
+        total_images = len(dataset.sampler.data_source.images)
         prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="red", desc="Validation Phase")
 
         # Set module status to train because we want to get the validation loss.
@@ -146,7 +147,7 @@ class SupervisedTrainer:
         annotation_id = 1
         min_number_of_points = 8
 
-        total_images = dataset.sampler.num_samples
+        total_images = len(dataset.sampler.data_source.images)
         prog_bar = tqdm(total=total_images, ascii=True, unit="images", colour="yellow", desc="COCO Evaluation Phase")
 
         self.model.eval()
@@ -164,9 +165,6 @@ class SupervisedTrainer:
                     mask[mask > 0.5] = 1
                     mask[mask < 1] = 0
                     mask = mask.astype(np.uint8)
-
-                    if mask.sum() == 0:
-                        continue
 
                     __, segmentation = extract_bbox_segmentation(mask)
 
@@ -202,7 +200,7 @@ class SupervisedTrainer:
         evaluator.accumulate()
         evaluator.summarize()
 
-    def fit(self, training_data: DataLoader, validation_data: DataLoader, optimizer: Optimizer, epochs: int, **kwargs):
+    def fit(self, training_data: DataLoader, validation_data: DataLoader, epochs: int, **kwargs):
         """Fits the model to the training dataset and validates it on the validation dataset for a
         specified number of epochs.
 
@@ -218,7 +216,7 @@ class SupervisedTrainer:
         for epoch in range(epochs):
             print(f"Epoch {epoch}")
 
-            loss_training = self.train(training_data, optimizer)
+            loss_training = self.train(training_data)
             loss_validation = self.evaluate(validation_data)
 
             if coco_eval_frequency is not None and epoch % coco_eval_frequency == 0:
