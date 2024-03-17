@@ -166,6 +166,9 @@ class SupervisedTrainer:
                     mask[mask < 1] = 0
                     mask = mask.astype(np.uint8)
 
+                    if mask.sum() == 0:
+                        continue
+
                     __, segmentation = extract_bbox_segmentation(mask)
 
                     if len(segmentation) < min_number_of_points:
