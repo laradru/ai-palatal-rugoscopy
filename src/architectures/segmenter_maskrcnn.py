@@ -9,7 +9,7 @@ from src.architectures.arch_base import ArchBase
 
 
 class MaskRCNNSegmenter(ArchBase):
-    def __init__(self, model_path: str, num_classes: int) -> None:
+    def __init__(self, model_path: str, num_classes: int, **kwargs) -> None:
         """Class constructor.
 
         Args:
@@ -30,6 +30,9 @@ class MaskRCNNSegmenter(ArchBase):
         mask_predictor = torchvision.models.detection.mask_rcnn.MaskRCNNPredictor(in_features_mask, hidden, num_classes)
         self.model.roi_heads.box_predictor = box_predictor
         self.model.roi_heads.mask_predictor = mask_predictor
+
+        self.learning_rate = kwargs.get("lr", 0.001)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate)
 
     def forward(self, x: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Forward pass of the model.
