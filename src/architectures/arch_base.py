@@ -8,7 +8,7 @@ from abc import ABC
 import torch
 
 
-class ArchBase(ABC):
+class ArchBase(torch.nn.Module, ABC):
     def __init__(self, model_path: str) -> None:
         """Class constructor.
 
