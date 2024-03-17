@@ -43,7 +43,7 @@ def create_training_report(args: dict) -> None:
         f.write(f"GPU: {args.get('gpu')}\n")
 
 
-def load_model(checkpoint_path: str, num_classes: int) -> torch.nn.Module:
+def load_mask_rcnn(checkpoint_path: str, num_classes: int, **kwargs) -> MaskRCNNSegmenter:
     """Load a pre-trained model.
 
     Args:
@@ -54,7 +54,7 @@ def load_model(checkpoint_path: str, num_classes: int) -> torch.nn.Module:
         torch.nn.Module: The loaded model.
     """
 
-    model = MaskRCNNSegmenter(checkpoint_path, num_classes)
+    model = MaskRCNNSegmenter(checkpoint_path, num_classes, **kwargs)
     model.load()
 
     return model
@@ -136,7 +136,7 @@ def train(args: dict) -> None:
         preprocessing_funcs=preprocessing_funcs,
         augmentations_funcs=None,  # No augmentation in validation!
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=False,
         seed=seed,
     )
 
@@ -150,13 +150,12 @@ def train(args: dict) -> None:
 
     # Load model. Weights will be saved in output_path.
     checkpoint_path = os.path.join(output_path, "checkpoint.pth")
-    model = load_model(checkpoint_path, num_classes=len(train_set.categories))
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    mask_rcnn = load_mask_rcnn(checkpoint_path, num_classes=len(train_set.categories), lr=learning_rate)
 
     # Start training
     create_training_report(args)
-    trainer = SupervisedTrainer(device, model, recorder, seed)
-    trainer.fit(train_loader, validation_loader, optimizer, epochs, coco_eval_frequency=coco_eval_frequency)
+    trainer = SupervisedTrainer(device, mask_rcnn, recorder, seed)
+    trainer.fit(train_loader, validation_loader, epochs, coco_eval_frequency=coco_eval_frequency)
 
 
 def build_arg_parser() -> ArgumentParser:
