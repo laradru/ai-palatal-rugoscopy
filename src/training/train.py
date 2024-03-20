@@ -44,18 +44,21 @@ def create_training_report(args: dict) -> None:
 
 
 def load_mask_rcnn(checkpoint_path: str, num_classes: int, **kwargs) -> MaskRCNNSegmenter:
-    """Load a pre-trained model.
+    """Load a Mask R-CNN model for segmentation.
 
     Args:
         checkpoint_path (str): The path to the checkpoint file.
         num_classes (int): The number of classes in the dataset.
+        **kwargs: Additional keyword arguments.
 
     Returns:
-        torch.nn.Module: The loaded model.
+        MaskRCNNSegmenter: The loaded Mask R-CNN segmenter model.
     """
 
     model = MaskRCNNSegmenter(checkpoint_path, num_classes, **kwargs)
-    model.load()
+
+    if kwargs.get("load_weights", False):
+        model.load()
 
     return model
 
@@ -147,10 +150,15 @@ def train(args: dict) -> None:
     coco_eval_frequency = args.get("coco_eval_frequency")
     device = torch.device("cuda") if args.get("gpu") and torch.cuda.is_available() else torch.device("cpu")
     recorder = TrainingRecorder(f"{output_path}/training_{datetime.now().__str__()}")
+    continue_training = args.get("continue", False)
 
     # Load model. Weights will be saved in output_path.
-    checkpoint_path = os.path.join(output_path, "checkpoint.pth")
-    mask_rcnn = load_mask_rcnn(checkpoint_path, num_classes=len(train_set.categories), lr=learning_rate)
+    mask_rcnn = load_mask_rcnn(
+        checkpoint_path=os.path.join(output_path, "checkpoint.pth"),
+        num_classes=len(train_set.categories),
+        lr=learning_rate,
+        load_weights=continue_training,
+    )
 
     # Start training
     create_training_report(args)
@@ -255,6 +263,13 @@ def build_arg_parser() -> ArgumentParser:
         "--gpu",
         action="store_true",
         help="Whether to use GPU or not",
+        default=True,
+    )
+
+    parser.add_argument(
+        "--continue",
+        action="store_true",
+        help="Whether to continue training or not",
         default=True,
     )
 
