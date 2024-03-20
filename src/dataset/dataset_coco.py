@@ -67,7 +67,7 @@ class CocoDataset(MutableDataset):
     def preview_dataset(self) -> None:
         """Prints a preview of the dataset by displaying some dataset statistics."""
 
-        horizontal_bar_length = 100
+        horizontal_bar_length = 120
         categories_str = [f"{c['id']}: {c['name']}" for c in self.tree.data["categories"]]
 
         print("=" * horizontal_bar_length)
@@ -341,6 +341,9 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
             np.random.shuffle(all_images_ids)
 
         for ss in subset_sizes:
+            if ss == 0:  # Skip empty subsets
+                continue
+
             subset = deepcopy(self)
             indexes = all_images_ids[:ss]
 
