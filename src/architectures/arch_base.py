@@ -61,3 +61,13 @@ class ArchBase(torch.nn.Module, ABC):
         except Exception as excpt:
             print(f"Error while loading model checkpoints: {excpt}")
             return False
+
+    def freeze_layer(self, layer_name: str) -> None:
+        """Freeze the weights of the specified layer.
+
+        Args:
+            layer_name (str): The name of the layer to freeze.
+        """
+
+        for param in getattr(self.model, layer_name).parameters():
+            param.requires_grad = False
