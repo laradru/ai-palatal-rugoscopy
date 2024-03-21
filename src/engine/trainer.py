@@ -12,7 +12,7 @@ from tqdm import tqdm
 from src.architectures.arch_base import ArchBase
 from src.dataset.annotations_coco import COCOAnnotations
 from src.dataset.dataset_utils import extract_bbox_segmentation
-from src.training.tensorboard import TrainingRecorder
+from src.training.tensorboard_writer import TrainingRecorder
 
 
 class SupervisedTrainer:
@@ -79,8 +79,8 @@ class SupervisedTrainer:
 
                 # Loss computation and weights correction
                 loss = sum(loss for loss in losses.values())
-                loss.backward()  # backpropagation
-                self.optimizer.step()
+                loss.backward()  # compute new gradients
+                self.optimizer.step()  # update weights
 
                 loss_train = {key: loss_train[key] + value.item() for key, value in losses.items()}
 

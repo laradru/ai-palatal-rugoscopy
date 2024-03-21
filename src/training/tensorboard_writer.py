@@ -3,7 +3,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 import torch
-from torch.utils.tensorboard.writer import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 
 class TrainingRecorder:
@@ -39,6 +39,19 @@ class TrainingRecorder:
         """
 
         self.writer.add_image(tag, image, step)
+
+    def record_gt_prediction(self, tag: str, ground_truth: torch.Tensor, prediction: torch.Tensor, step=None) -> None:
+        """Records a ground truth and prediction image with a given tag and adds it to the writer.
+
+        Args:
+            tag (str): The tag for the image.
+            ground_truth (torch.Tensor): The ground truth image to be recorded.
+            prediction (torch.Tensor): The prediction image to be recorded.
+            step (Optional): The step number for the image. Default is None.
+        """
+
+        self.writer.add_image(f"{tag}_gt", ground_truth, step)
+        self.writer.add_image(f"{tag}_pred", prediction, step)
 
     def close(self) -> None:
         """Closes the writer."""

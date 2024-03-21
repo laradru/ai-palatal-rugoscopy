@@ -19,6 +19,7 @@ class MaskRCNNSegmenter(ArchBase):
 
         super().__init__(model_path)
 
+        num_classes += 1  # Add background class
         weights_base = torchvision.models.detection.MaskRCNN_ResNet50_FPN_Weights.DEFAULT
         self.model = torchvision.models.detection.mask_rcnn.maskrcnn_resnet50_fpn(weights=weights_base)
 

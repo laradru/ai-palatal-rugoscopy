@@ -109,7 +109,7 @@ class CocoDatasetClassification(CocoDataset):
         """
 
         annotation = self.annotations[idx]
-        image_data = self.images[annotation["image_id"]]
+        image_data = deepcopy(self.images[annotation["image_id"]])
         image_path = os.path.join(self.data_directory_path, image_data[0]["file_name"])
         image = read_image(image_path)
 
@@ -163,7 +163,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         """
 
         image_data = self.images[idx]
-        annotations = self.annotations[image_data["id"]]
+        annotations = deepcopy(self.annotations[image_data["id"]])
         image_path = os.path.join(self.data_directory_path, image_data["file_name"])
         image = read_image(image_path)
 

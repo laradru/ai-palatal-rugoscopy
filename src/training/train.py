@@ -12,7 +12,7 @@ from src.dataset.composer import OrderedCompose
 from src.dataset.dataset_coco import CocoDatasetInstanceSegmentation
 from src.dataset.preprocessing import CocoPreprocessing
 from src.engine.trainer import SupervisedTrainer
-from src.training.tensorboard import TrainingRecorder
+from src.training.tensorboard_writer import TrainingRecorder
 
 
 def create_training_report(args: dict) -> None:
@@ -249,28 +249,24 @@ def build_arg_parser() -> ArgumentParser:
         "--preprocess",
         action="store_true",
         help="Whether to preprocess the dataset or not",
-        default=False,
     )
 
     parser.add_argument(
         "--augment",
         action="store_true",
         help="Whether to augment the dataset or not",
-        default=False,
     )
 
     parser.add_argument(
         "--gpu",
         action="store_true",
         help="Whether to use GPU or not",
-        default=True,
     )
 
     parser.add_argument(
         "--continue",
         action="store_true",
         help="Whether to continue training or not",
-        default=True,
     )
 
     return parser
