@@ -35,6 +35,11 @@ def init_context(context):
     context.logger.info("Init context...  100%")
 
 
+def read_categories():
+    categories = COCOAnnotations.load_file(file_path=CATEGORIES_FILEPATH).get("categories")
+    return {str(category["id"]): category["name"] for category in categories}
+
+
 def handler(context: Context, event: Event) -> Context.Response:
     context.logger.info("Starting automatic annotation...")
 
@@ -55,7 +60,7 @@ def handler(context: Context, event: Event) -> Context.Response:
         resized_masks.append(mask)
 
     predictions["masks"] = resized_masks
-    results = to_cvat(predictions)
+    results = to_cvat(predictions, read_categories())
 
     context.logger.info("Finished automatic annotation")
 
@@ -70,4 +75,4 @@ def handler(context: Context, event: Event) -> Context.Response:
 if __name__ == "__main__":
     context = Context()
     init_context(context)
-    response = handler(context, Event("/home/joaoherrera/data/rugae/manual/images/DSC_0737.JPG", 0.5))
+    response = handler(context, Event("/home/drugo/data/manual/images/IMG_7282_cel.jpg", 0.5))
