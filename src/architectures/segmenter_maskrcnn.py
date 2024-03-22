@@ -3,7 +3,7 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 import torch
-import torchvision
+from torchvision.models import detection
 
 from src.architectures.arch_base import ArchBase
 
@@ -19,16 +19,16 @@ class MaskRCNNSegmenter(ArchBase):
 
         super().__init__(model_path)
 
-        num_classes += 1  # Add background class
-        weights_base = torchvision.models.detection.MaskRCNN_ResNet50_FPN_Weights.DEFAULT
-        self.model = torchvision.models.detection.mask_rcnn.maskrcnn_resnet50_fpn(weights=weights_base)
+        self.num_classes = num_classes + 1  # Add background class
+        weights_base = detection.MaskRCNN_ResNet50_FPN_Weights.DEFAULT
+        self.model = detection.mask_rcnn.maskrcnn_resnet50_fpn(weights=weights_base)
 
         in_features_box = self.model.roi_heads.box_predictor.cls_score.in_features
         in_features_mask = self.model.roi_heads.mask_predictor.conv5_mask.in_channels
         hidden = 256
 
-        box_predictor = torchvision.models.detection.faster_rcnn.FastRCNNPredictor(in_features_box, num_classes)
-        mask_predictor = torchvision.models.detection.mask_rcnn.MaskRCNNPredictor(in_features_mask, hidden, num_classes)
+        box_predictor = detection.faster_rcnn.FastRCNNPredictor(in_features_box, self.num_classes)
+        mask_predictor = detection.mask_rcnn.MaskRCNNPredictor(in_features_mask, hidden, self.num_classes)
         self.model.roi_heads.box_predictor = box_predictor
         self.model.roi_heads.mask_predictor = mask_predictor
 

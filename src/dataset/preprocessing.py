@@ -53,9 +53,10 @@ class CocoPreprocessing:
         resize_factor = target / max(rows, cols)
 
         # Update annotations
-        for instance in range(len(annotations)):
-            bbox, seg = np.array(annotations[instance]["bbox"]), np.array(annotations[instance]["segmentation"])
-            annotations[instance]["bbox"] = (bbox * resize_factor).tolist()
-            annotations[instance]["segmentation"] = (seg * resize_factor).tolist()
+        if annotations:
+            for instance in range(len(annotations)):
+                bbox, seg = np.array(annotations[instance]["bbox"]), np.array(annotations[instance]["segmentation"])
+                annotations[instance]["bbox"] = (bbox * resize_factor).tolist()
+                annotations[instance]["segmentation"] = (seg * resize_factor).tolist()
 
         return cv2.resize(image, None, fx=resize_factor, fy=resize_factor), annotations

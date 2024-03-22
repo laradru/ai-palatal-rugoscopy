@@ -290,3 +290,15 @@ def custom_collate(data):
         annotations.append(instance[1])
 
     return imgs, annotations
+
+
+def to_cvat(predictions: Dict) -> List[Dict]:
+    response = []
+
+    for mask, label, score in zip(predictions["masks"], predictions["labels"], predictions["scores"]):
+        if np.any(mask > 0):
+            __, segmentation = extract_bbox_segmentation(mask)
+            segmentation = list(map(float, segmentation))
+            response.append({"confidence": 1, "label": label, "points": segmentation, "type": "polygon"})
+
+    return response
