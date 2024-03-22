@@ -19,7 +19,7 @@ class MaskRCNNSegmenter(ArchBase):
 
         super().__init__(model_path)
 
-        self.num_classes = num_classes + 1  # Add background class
+        self.num_classes = num_classes
         weights_base = detection.MaskRCNN_ResNet50_FPN_Weights.DEFAULT
         self.model = detection.mask_rcnn.maskrcnn_resnet50_fpn(weights=weights_base)
 
