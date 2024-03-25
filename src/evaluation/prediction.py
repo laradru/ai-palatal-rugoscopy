@@ -23,19 +23,6 @@ class BasePrediction(ABC):
         self.model = model
         self.model.eval()
 
-    def predict(self, batch: torch.Tensor) -> Dict:
-        """Predicts the output for a given input batch using the trained model.
-
-        Args:
-            batch (torch.Tensor): The input batch to make predictions on.
-        Returns:
-            Dict: A dictionary containing the predictions made by the model.
-        """
-
-        with torch.no_grad():
-            predictions = self.model([batch], None)[0]
-        return predictions
-
 
 class MaskRCNNPrediction(BasePrediction):
 
@@ -44,7 +31,6 @@ class MaskRCNNPrediction(BasePrediction):
 
         Args:
             model_path (str): The path to the model.
-            num_classes (int): The number of classes for the model.
             pre_procs (OrderedCompose): A preprocessing pipeline.
             device (str, optional): The device to be used for computation (default is "cuda:0").
         """
@@ -53,13 +39,28 @@ class MaskRCNNPrediction(BasePrediction):
 
         super().__init__(model, device)
 
-    def preprocess(self, image: np.ndarray) -> torch.Tensor:
-        """Preprocesses the input patch by transposing its dimensions and converting it to a torch Tensor.
+    def predict(self, batch: torch.Tensor) -> Dict:
+        """A function that makes predictions using the model.
 
         Args:
-            patch (np.ndarray): The input patch to be preprocessed.
+            batch (torch.Tensor): The input batch of data.
+
         Returns:
-            torch.Tensor: The preprocessed patch as a torch Tensor.
+            Dict: The predictions made by the model.
+        """
+
+        with torch.no_grad():
+            predictions = self.model([batch], None)[0]
+        return predictions
+
+    def preprocess(self, image: np.ndarray) -> torch.Tensor:
+        """Preprocesses the input image using the specified preproc_funcs and converts it to a torch.Tensor.
+
+        Args:
+            image (np.ndarray): The input image to be preprocessed.
+
+        Returns:
+            torch.Tensor: The preprocessed image as a torch.Tensor.
         """
 
         if self.preproc_funcs is not None:
@@ -67,12 +68,15 @@ class MaskRCNNPrediction(BasePrediction):
 
         return T.ToTensor()(image).to(self.device)
 
-    def postprocess(self, pred: List[Dict], threshold: float = 0.5) -> Tuple[List, List, List]:
+    def postprocess(
+        self, pred: List[Dict], confidence_threshold: float = 0.5, segmentation_threshold: float = 0.5
+    ) -> Tuple[List, List, List]:
         """Generate postprocessed masks, labels, and scores from the prediction.
 
         Args:
             pred (Dict): The prediction dictionary containing 'masks', 'labels', and 'scores'.
-            threshold (float): The minimum confidence threshold for predictions. 0 for all predictions.
+            confidence_threshold (float): The minimum confidence threshold for predictions. 0 for all predictions.
+            segmentation_threshold (float): The minimum segmentation threshold for predictions. 0 for all predictions.
 
         Returns:
             Tuple[List, List, List]: A tuple containing lists of postprocessed masks, labels, and scores.
@@ -80,15 +84,15 @@ class MaskRCNNPrediction(BasePrediction):
 
         masks, labels, scores = pred["masks"], pred["labels"], pred["scores"]
 
-        valid_items = scores > threshold
+        valid_items = scores > confidence_threshold
         masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
 
         masks = masks.detach().cpu().numpy().squeeze(1)
         labels = labels.detach().cpu().tolist()
         scores = scores.detach().cpu().tolist()
 
-        masks[masks >= 0.5] = 1
-        masks[masks < 0.5] = 0
+        masks[masks >= segmentation_threshold] = 1
+        masks[masks < segmentation_threshold] = 0
         masks = masks.astype(np.uint8)
 
         return masks, labels, scores

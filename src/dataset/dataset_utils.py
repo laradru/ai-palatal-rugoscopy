@@ -293,14 +293,31 @@ def custom_collate(data):
 
 
 def to_cvat(predictions: Dict, categories: Dict[str, str]) -> List[Dict]:
-    response = []
+    """Converts predictions from a model to the CVAT format.
+
+    Args:
+        predictions (Dict): A dictionary containing the model predictions. It should have the following keys:
+            - "masks": A numpy array representing the masks of the predictions.
+            - "labels": A numpy array representing the labels of the predictions.
+            - "scores": A numpy array representing the scores of the predictions.
+        categories (Dict[str, str]): A dictionary mapping labels to their corresponding names.
+
+    Returns:
+        List[Dict]: A list of dictionaries representing the predictions in the CVAT format.
+        Each dictionary contains the following keys:
+            - "confidence": The confidence score of the prediction.
+            - "label": The name of the predicted label.
+            - "points": The segmentation points of the prediction.
+            - "type": The type of the prediction (always "polygon" in this case).
+    """
+
+    res = []
 
     for mask, label, score in zip(predictions["masks"], predictions["labels"], predictions["scores"]):
         if np.any(mask > 0):
+            label = str(label)
             __, segmentation = extract_bbox_segmentation(mask)
             segmentation = list(map(float, segmentation))
-            response.append(
-                {"confidence": score, "label": categories[str(label)], "points": segmentation, "type": "polygon"}
-            )
+            res.append({"confidence": score, "label": categories[label], "points": segmentation, "type": "polygon"})
 
-    return response
+    return res
