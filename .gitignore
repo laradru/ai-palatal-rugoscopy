@@ -138,3 +138,9 @@ datasets/
 
 # Ignore data folder
 data/**
+
+# nuctl binary file
+nuctl
+
+# checkpoint file
+checkpoint.pth
