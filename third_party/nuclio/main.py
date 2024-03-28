@@ -45,18 +45,23 @@ def handler(context: Context, event: Event) -> Context.Response:
 
     data = event.body
     buffer = io.BytesIO(base64.b64decode(data["image"]))  # Image to be annotated.
+    predictor: MaskRCNNPrediction = context.user_data.model
+    threshold = float(data.get("threshold", 0.0))  # Defined on CVAT interface.
 
-    threshold = float(data.get("threshold", 0.5))  # Defined on CVAT interface.
     image = np.array(Image.open(buffer))
     rows, cols = image.shape[:2]
 
-    predictor: MaskRCNNPrediction = context.user_data.model
-    predictions = predictor.predict_image(image, threshold)
+    predictions = predictor.predict_image(
+        image,
+        confidence_threshold=threshold,
+        segmentation_threshold=0.5,
+        nms_threshold=0.4,
+    )
 
     resized_masks = []
     for i in range(len(predictions["masks"])):
         mask = predictions["masks"][i]
-        mask = cv2.resize(mask, (cols, rows), interpolation=cv2.INTER_NEAREST)
+        mask = cv2.resize(mask, (cols, rows), interpolation=cv2.INTER_CUBIC)
         resized_masks.append(mask)
 
     predictions["masks"] = resized_masks
@@ -75,4 +80,4 @@ def handler(context: Context, event: Event) -> Context.Response:
 if __name__ == "__main__":
     context = Context()
     init_context(context)
-    response = handler(context, Event("/home/drugo/data/manual/images/IMG_7282_cel.jpg", 0.5))
+    response = handler(context, Event("/home/joaoherrera/data/rugae/manual/images/IMG_7282_cel.jpg", 0.5))

@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple
 import numpy as np
 import torch
 import torchvision.transforms as T
+from torchvision.ops.boxes import nms
 
 from src.architectures.arch_base import ArchBase
 from src.architectures.segmenter_maskrcnn import MaskRCNNSegmenter
@@ -69,14 +70,19 @@ class MaskRCNNPrediction(BasePrediction):
         return T.ToTensor()(image).to(self.device)
 
     def postprocess(
-        self, pred: List[Dict], confidence_threshold: float = 0.5, segmentation_threshold: float = 0.5
+        self,
+        pred: List[Dict],
+        confidence_threshold: float = 0.5,
+        segmentation_threshold: float = 0.5,
+        nms_threshold: float = 0.3,
     ) -> Tuple[List, List, List]:
         """Generate postprocessed masks, labels, and scores from the prediction.
 
         Args:
             pred (Dict): The prediction dictionary containing 'masks', 'labels', and 'scores'.
-            confidence_threshold (float): The minimum confidence threshold for predictions. 0 for all predictions.
-            segmentation_threshold (float): The minimum segmentation threshold for predictions. 0 for all predictions.
+            confidence_threshold (float): The minimum confidence threshold for predictions. Defaults to 0.5.
+            segmentation_threshold (float): The minimum segmentation threshold for predictions. Defaults to 0.5.
+            nms_threshold (float): The NMS threshold. Defaults to 0.3.
 
         Returns:
             Tuple[List, List, List]: A tuple containing lists of postprocessed masks, labels, and scores.
@@ -84,7 +90,12 @@ class MaskRCNNPrediction(BasePrediction):
 
         masks, labels, scores = pred["masks"], pred["labels"], pred["scores"]
 
-        valid_items = scores > confidence_threshold
+        # Apply nms algorithm
+        valid_items = nms(pred["boxes"], scores, nms_threshold)
+        masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
+
+        # Filter results by confidence score
+        valid_items = scores >= confidence_threshold
         masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
 
         masks = masks.detach().cpu().numpy().squeeze(1)
@@ -97,20 +108,34 @@ class MaskRCNNPrediction(BasePrediction):
 
         return masks, labels, scores
 
-    def predict_image(self, image: np.ndarray, threshold: float = 0.5) -> Dict:
+    def predict_image(
+        self,
+        image: np.ndarray,
+        confidence_threshold: float = 0.5,
+        segmentation_threshold: float = 0.5,
+        nms_threshold: float = 0.3,
+    ) -> Dict:
         """Predicts the labels and masks for an input image using the given threshold.
 
         Args:
             image (np.ndarray): The input image for prediction.
-            threshold (float, optional): The confidence threshold for label prediction. Defaults to 0.5.
+            confidence_threshold (float, optional): Minimum confidence threshold for predictions. Defaults to 0.5.
+            segmentation_threshold (float, optional): Minimum segmentation threshold for predictions. Defaults to 0.5.
+            nms_threshold (float, optional): The NMS threshold. Defaults to 0.3.
+
         Returns:
             Dict: A dictionary containing segmented masks for each category.
         """
 
         masks, labels, scores = [], [], []
-        batch = self.preprocess(image)  # batch of a single image.
+        one_batch_image = self.preprocess(image)  # batch of a single image.
+        one_batch_image_pred = self.predict(one_batch_image)
 
-        batch_pred = self.predict(batch)
-        masks, labels, scores = self.postprocess(batch_pred, threshold)
+        masks, labels, scores = self.postprocess(
+            pred=one_batch_image_pred,
+            confidence_threshold=confidence_threshold,
+            segmentation_threshold=segmentation_threshold,
+            nms_threshold=nms_threshold,
+        )
 
         return {"masks": masks, "labels": labels, "scores": scores}
