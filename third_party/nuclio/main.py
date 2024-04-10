@@ -75,9 +75,3 @@ def handler(context: Context, event: Event) -> Context.Response:
         content_type="application/json",
         status_code=200,
     )
-
-
-if __name__ == "__main__":
-    context = Context()
-    init_context(context)
-    response = handler(context, Event("/home/joaoherrera/data/rugae/manual/images/IMG_7282_cel.jpg", 0.5))
