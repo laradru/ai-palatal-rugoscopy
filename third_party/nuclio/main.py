@@ -37,7 +37,7 @@ def init_context(context):
 
 def read_categories():
     categories = COCOAnnotations.load_file(file_path=CATEGORIES_FILEPATH).get("categories")
-    return {str(category["id"]): category["name"] for category in categories}
+    return {str(category["id"] - 1): category["name"] for category in categories}
 
 
 def handler(context: Context, event: Event) -> Context.Response:
