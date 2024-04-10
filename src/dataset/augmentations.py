@@ -7,60 +7,41 @@
 
 from typing import Dict, Tuple
 
-import albumentations
+import albumentations as A
 import numpy as np
 
 
 class Augmentations:
-    transformer = albumentations.Compose(
+    transformer = A.Compose(
         [
-            albumentations.RandomRotate90(
+            A.Equalize(always_apply=False, p=1.0, mode="cv", by_channels=True),
+            A.Flip(always_apply=False, p=0.3),
+            A.Blur(always_apply=False, p=0.2, blur_limit=(3, 5)),
+            A.CLAHE(always_apply=False, p=0.2, clip_limit=(1, 2), tile_grid_size=(2, 2)),
+            A.ChannelShuffle(always_apply=False, p=0.1),
+            A.JpegCompression(always_apply=False, p=0.3, quality_lower=50, quality_upper=100),
+            A.ElasticTransform(
                 always_apply=False,
-                p=0.5,
-            ),
-            albumentations.Downscale(
-                always_apply=False,
-                p=0.5,
-                scale_min=0.87,
-                scale_max=0.99,
-            ),
-            albumentations.GridDistortion(
-                always_apply=False,
-                p=0.5,
-                num_steps=1,
-                distort_limit=(-0.12, 0.07),
+                p=0.3,
+                alpha=1.04,
+                sigma=10.07,
+                alpha_affine=10.74,
                 interpolation=0,
                 border_mode=4,
                 value=(0, 0, 0),
                 mask_value=None,
-                normalized=False,
+                approximate=False,
             ),
-            albumentations.RandomBrightnessContrast(
+            A.ShiftScaleRotate(
                 always_apply=False,
                 p=0.5,
-                brightness_limit=(-0.16, 0.52),
-                contrast_limit=(-0.3, 0.2),
-                brightness_by_max=True,
-            ),
-            albumentations.ShiftScaleRotate(
-                always_apply=False,
-                p=0.5,
-                shift_limit_x=(-0.01, -0.01),
-                shift_limit_y=(-0.01, -0.01),
-                scale_limit=(-0.07999999999999996, 0.8599999999999999),
-                rotate_limit=(5, 0),
-                interpolation=4,
+                shift_limit=(0.00, 0.00),
+                scale_limit=(0.00, 1.00),
+                rotate_limit=(-360, 360),
+                interpolation=2,
                 border_mode=4,
                 value=(0, 0, 0),
                 mask_value=None,
-                rotate_method="largest_box",
-            ),
-            albumentations.HueSaturationValue(
-                always_apply=False,
-                p=0.5,
-                hue_shift_limit=(-30, 30),
-                sat_shift_limit=(-30, 30),
-                val_shift_limit=(-30, 30),
             ),
         ]
     )

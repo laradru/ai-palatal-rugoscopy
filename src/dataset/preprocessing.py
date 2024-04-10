@@ -2,7 +2,6 @@
 # Basics for preprocessing images and annotations.                                                                    #
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-from ctypes import ArgumentError
 from typing import Dict, Tuple
 
 import cv2
@@ -36,23 +35,28 @@ class CocoPreprocessing:
         return image[:, bbox[1] : (bbox[1] + bbox[3]), bbox[0] : (bbox[0] + bbox[2])], annotations
 
     @staticmethod
-    def resize(image: np.ndarray, annotations: Dict, **kwargs: Dict) -> Tuple[np.ndarray, Dict]:
-        """Resizes an image using the OpenCV `cv2.resize` function.
+    def resize_to_target(image: np.ndarray, annotations: Dict, **kwargs: Dict) -> Tuple[np.ndarray, Dict]:
+        """Resize the given image and its annotations to the target size.
 
         Args:
-            image (np.ndarray): The image to be resized.
+            image (np.ndarray): The input image to be resized.
             annotations (Dict): The annotations associated with the image.
-            **kwargs (Dict): Additional keyword arguments for the `cv2.resize` function.
-                size (Tuple[int, int]): The size to which the image should be resized.
+            **kwargs (Dict): Additional keyword arguments.
 
         Returns:
-            Tuple[np.ndarray, Dict]: A tuple containing the resized image and the annotations.
-        Raises:
-            ArgumentError: If the size is not specified.
+            Tuple[np.ndarray, Dict]: A tuple containing the resized image and updated annotations.
         """
 
-        if "size" in kwargs.keys():
-            size = kwargs["size"]
-            return cv2.resize(image, size), annotations
-        else:
-            raise ArgumentError("Size is not specified.")
+        target = kwargs["resize_target"]
+
+        rows, cols = image.shape[:2]
+        resize_factor = target / max(rows, cols)
+
+        # Update annotations
+        if annotations:
+            for instance in range(len(annotations)):
+                bbox, seg = np.array(annotations[instance]["bbox"]), np.array(annotations[instance]["segmentation"])
+                annotations[instance]["bbox"] = (bbox * resize_factor).tolist()
+                annotations[instance]["segmentation"] = (seg * resize_factor).tolist()
+
+        return cv2.resize(image, None, fx=resize_factor, fy=resize_factor), annotations

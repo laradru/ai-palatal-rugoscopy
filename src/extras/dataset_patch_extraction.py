@@ -1,5 +1,6 @@
 """Extract patches from a set of images and save them on disk.
 """
+
 from argparse import ArgumentParser
 from typing import Dict
 
@@ -24,8 +25,9 @@ def extract_patches(args: Dict) -> None:
     stride = args.get("stride")
     min_area_percentage = args.get("min_area_percentage")
     output_path = args.get("output_path")
+    resize_image_width = args.get("resize_image_width")
 
-    dataset.extract_patches(output_path, patch_size, stride, min_area_percentage)
+    dataset.extract_patches(output_path, patch_size, stride, min_area_percentage, resize_image_width=resize_image_width)
 
 
 def build_arg_parser() -> ArgumentParser:
@@ -56,6 +58,14 @@ def build_arg_parser() -> ArgumentParser:
         type=str,
         help="Path to the output directory.",
         required=True,
+    )
+
+    parser.add_argument(
+        "--resize-image-width",
+        type=int,
+        help="Width of the resized image. Defaults to None, which means no resizing.",
+        default=None,
+        required=False,
     )
 
     parser.add_argument(

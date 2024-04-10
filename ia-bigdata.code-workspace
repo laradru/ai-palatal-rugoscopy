@@ -14,7 +14,8 @@
 			"editor.codeActionsOnSave": {
 				"source.organizeImports": "explicit"
 			},
-		}
+		},
+		"jupyter.notebookFileRoot": "${workspaceFolder}"
 	},
 	"extensions": {
 		"recommendations": [

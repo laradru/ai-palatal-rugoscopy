@@ -1,0 +1,58 @@
+apiVersion: "nuclio.io/v1"
+kind: NuclioFunction
+
+metadata:
+  name: palatal-rugoscopy-annotator
+  namespace: cvat
+
+  annotations:
+    name: Mask R-CNN
+    type: detector
+    framework: pytorch
+    spec: |
+      [
+        { "id":  1, "name": "Straight" },
+        { "id":  2, "name": "Curved" },
+        { "id":  3, "name": "Circular" },
+        { "id":  4, "name": "Ramified" },
+        { "id":  5, "name": "Sinuous" },
+        { "id":  6, "name": "Other" }
+      ]
+
+spec:
+  description: "A Mask R-CNN model trained for automatic annotations of palatal rugae on CVAT."
+  runtime: "python:3.10"
+  handler: main:handler
+  eventTimeout: 600s
+  
+  build:
+    image: cvat/ai-palatal-rugoscopy-annotator
+    baseImage: ai-palatal-rugoscopy
+
+    directives:
+      preCopy:
+        - kind: ENV
+          value: DEBIAN_FRONTEND=noninteractive
+        - kind: ENV
+          value: PYTHONPATH=/opt/nuclio
+        - kind: WORKDIR
+          value: /opt/nuclio
+
+  triggers:
+    myHttpTrigger:
+      maxWorkers: 1
+      kind: 'http'
+      workerAvailabilityTimeoutMilliseconds: 10000
+      attributes:
+        maxRequestBodySize: 67108864 # 64MB
+  
+  platform:
+    attributes:
+      restartPolicy:
+        name: always
+        maximumRetryCount: 3
+      mountMode: volume
+  
+  resources:
+    limits:
+      nvidia.com/gpu: 1

@@ -19,6 +19,7 @@ class ArchBase(torch.nn.Module, ABC):
         super().__init__()
         self.model_path = model_path
         self.model: torch.nn.Module = None
+        self.optimizer: torch.optim.Optimizer = None
 
     def save(self) -> bool:
         """Saves the model checkpoint to a file.
@@ -29,10 +30,13 @@ class ArchBase(torch.nn.Module, ABC):
 
         try:
             if self.model_path is not None:
-                torch.save(self.model.state_dict(), self.model_path)
+                state = {"model": self.model.state_dict(), "optimizer": self.optimizer.state_dict()}
+                torch.save(state, self.model_path)
+
                 return True
             else:
                 return False
+
         except Exception as excpt:
             print(excpt)
             return False
@@ -46,10 +50,24 @@ class ArchBase(torch.nn.Module, ABC):
 
         try:
             if os.path.exists(self.model_path):
-                self.model.load_state_dict(torch.load(self.model_path))
+                checkpoint = torch.load(self.model_path)
+                self.model.load_state_dict(checkpoint["model"])
+                self.optimizer.load_state_dict(checkpoint["optimizer"])
+
                 return True
             else:
                 return False
+
         except Exception as excpt:
             print(f"Error while loading model checkpoints: {excpt}")
             return False
+
+    def freeze_layer(self, layer_name: str) -> None:
+        """Freeze the weights of the specified layer.
+
+        Args:
+            layer_name (str): The name of the layer to freeze.
+        """
+
+        for param in getattr(self.model, layer_name).parameters():
+            param.requires_grad = False

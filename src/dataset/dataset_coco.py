@@ -27,6 +27,7 @@ from src.dataset.dataset_utils import (
     patch_generator,
     read_image,
 )
+from src.dataset.preprocessing import CocoPreprocessing
 
 
 @dataclass
@@ -66,7 +67,7 @@ class CocoDataset(MutableDataset):
     def preview_dataset(self) -> None:
         """Prints a preview of the dataset by displaying some dataset statistics."""
 
-        horizontal_bar_length = 100
+        horizontal_bar_length = 120
         categories_str = [f"{c['id']}: {c['name']}" for c in self.tree.data["categories"]]
 
         print("=" * horizontal_bar_length)
@@ -108,7 +109,7 @@ class CocoDatasetClassification(CocoDataset):
         """
 
         annotation = self.annotations[idx]
-        image_data = self.images[annotation["image_id"]]
+        image_data = deepcopy(self.images[annotation["image_id"]])
         image_path = os.path.join(self.data_directory_path, image_data[0]["file_name"])
         image = read_image(image_path)
 
@@ -162,7 +163,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         """
 
         image_data = self.images[idx]
-        annotations = self.annotations[image_data["id"]]
+        annotations = deepcopy(self.annotations[image_data["id"]])
         image_path = os.path.join(self.data_directory_path, image_data["file_name"])
         image = read_image(image_path)
 
@@ -198,7 +199,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
 
         return len(self.images)
 
-    def extract_patches(self, output_dir: str, patch_size: int, stride: int, min_area_percent: float) -> None:
+    def extract_patches(self, output_dir: str, patch_size: int, stride: int, min_area_percent: float, **kwargs) -> None:
         """Extracts patches from images and saves them along with their annotations.
 
         Args:
@@ -222,6 +223,8 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
         images_output_dir = os.path.join(output_dir, "images")
         annotations_output_dir = os.path.join(output_dir, "annotations")
         min_area = patch_size * patch_size * min_area_percent
+        resize_image_width = kwargs.get("resize_image_width", None)
+        rfactor = 1.0
 
         # Create output subdirectories.
         os.makedirs(images_output_dir, exist_ok=True)
@@ -243,6 +246,15 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
             binary_mask = generate_binary_mask(extended_image, image_annotations)
             category_mask = generate_category_mask(extended_image, image_annotations)
             __, component_mask = cv2.connectedComponents(binary_mask)
+            component_mask = component_mask.astype(binary_mask.dtype)
+
+            if resize_image_width is not None:
+                rfactor = resize_image_width / max(image.shape[0], image.shape[1])
+
+                image, __ = CocoPreprocessing.resize_with_factor(image, None, resize_factor=rfactor)
+                binary_mask, __ = CocoPreprocessing.resize_with_factor(binary_mask, None, resize_factor=rfactor)
+                category_mask, __ = CocoPreprocessing.resize_with_factor(category_mask, None, resize_factor=rfactor)
+                component_mask, __ = CocoPreprocessing.resize_with_factor(component_mask, None, resize_factor=rfactor)
 
             # ~~ Extract patches
             patch_gen = patch_generator(binary_mask, patch_size, stride)
@@ -262,7 +274,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                         continue
 
                     # ... or with less than min_area
-                    if any([area < min_area for area in np.bincount(patch_map.flatten())[1:]]):
+                    if any([area < min_area * rfactor for area in np.bincount(patch_map.flatten())[1:]]):
                         continue
 
                     patch_annotations.add_image_instance(image_id, patch_name, patch_rows, patch_cols)
@@ -288,7 +300,7 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
                             image_id=image_id,
                             category_id=int(instance_category),
                             bbox=instance_bbox,
-                            segmentation=[instance_segmentation],
+                            segmentation=[list(np.array(instance_segmentation, dtype=float))],
                             iscrowd=0,
                         )
 
@@ -329,6 +341,9 @@ class CocoDatasetInstanceSegmentation(CocoDataset):
             np.random.shuffle(all_images_ids)
 
         for ss in subset_sizes:
+            if ss == 0:  # Skip empty subsets
+                continue
+
             subset = deepcopy(self)
             indexes = all_images_ids[:ss]
 
@@ -371,10 +386,12 @@ def extended_dimensions(patch_size: int, stride: int, image_shape: Tuple[int, ..
 
     """
     return [
-        image_shape[i]
-        # do not extend if patches fit perfectly in the image
-        if (image_shape[i] - patch_size) % stride == 0
-        # calculate the last multiple of stride + patch_size, which ensures patches fit perfectly.
-        else (((image_shape[i] // stride) * stride) + patch_size)
+        (
+            image_shape[i]
+            # do not extend if patches fit perfectly in the image
+            if (image_shape[i] - patch_size) % stride == 0
+            # calculate the last multiple of stride + patch_size, which ensures patches fit perfectly.
+            else (((image_shape[i] // stride) * stride) + patch_size)
+        )
         for i in range(len(image_shape))
     ]

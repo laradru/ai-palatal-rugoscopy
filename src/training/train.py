@@ -10,8 +10,9 @@ from src.architectures.segmenter_maskrcnn import MaskRCNNSegmenter
 from src.dataset.augmentations import Augmentations
 from src.dataset.composer import OrderedCompose
 from src.dataset.dataset_coco import CocoDatasetInstanceSegmentation
+from src.dataset.preprocessing import CocoPreprocessing
 from src.engine.trainer import SupervisedTrainer
-from src.training.tensorboard import TrainingRecorder
+from src.training.tensorboard_writer import TrainingRecorder
 
 
 def create_training_report(args: dict) -> None:
@@ -42,19 +43,22 @@ def create_training_report(args: dict) -> None:
         f.write(f"GPU: {args.get('gpu')}\n")
 
 
-def load_model(checkpoint_path: str, num_classes: int) -> torch.nn.Module:
-    """Load a pre-trained model.
+def load_mask_rcnn(checkpoint_path: str, num_classes: int, **kwargs) -> MaskRCNNSegmenter:
+    """Load a Mask R-CNN model for segmentation.
 
     Args:
         checkpoint_path (str): The path to the checkpoint file.
         num_classes (int): The number of classes in the dataset.
+        **kwargs: Additional keyword arguments.
 
     Returns:
-        torch.nn.Module: The loaded model.
+        MaskRCNNSegmenter: The loaded Mask R-CNN segmenter model.
     """
 
-    model = MaskRCNNSegmenter(checkpoint_path, num_classes)
-    model.load()
+    model = MaskRCNNSegmenter(checkpoint_path, num_classes, **kwargs)
+
+    if kwargs.get("load_weights", False):
+        model.load()
 
     return model
 
@@ -115,7 +119,7 @@ def train(args: dict) -> None:
     preprocessing_funcs, augmentations_funcs = None, None
 
     if args.get("preprocess"):
-        preprocessing_funcs = None
+        preprocessing_funcs = OrderedCompose([CocoPreprocessing.resize_to_target], resize_target=1024)
     if args.get("augment"):
         augmentations_funcs = OrderedCompose([Augmentations.augment])
 
@@ -135,7 +139,7 @@ def train(args: dict) -> None:
         preprocessing_funcs=preprocessing_funcs,
         augmentations_funcs=None,  # No augmentation in validation!
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=False,
         seed=seed,
     )
 
@@ -146,16 +150,20 @@ def train(args: dict) -> None:
     coco_eval_frequency = args.get("coco_eval_frequency")
     device = torch.device("cuda") if args.get("gpu") and torch.cuda.is_available() else torch.device("cpu")
     recorder = TrainingRecorder(f"{output_path}/training_{datetime.now().__str__()}")
+    continue_training = args.get("continue", False)
 
     # Load model. Weights will be saved in output_path.
-    checkpoint_path = os.path.join(output_path, "checkpoint.pth")
-    model = load_model(checkpoint_path, num_classes=len(train_set.categories))
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    mask_rcnn = load_mask_rcnn(
+        checkpoint_path=os.path.join(output_path, "checkpoint.pth"),
+        num_classes=len(train_set.categories),
+        lr=learning_rate,
+        load_weights=continue_training,
+    )
 
     # Start training
     create_training_report(args)
-    trainer = SupervisedTrainer(device, model, recorder, seed)
-    trainer.fit(train_loader, validation_loader, optimizer, epochs, coco_eval_frequency=coco_eval_frequency)
+    trainer = SupervisedTrainer(device, mask_rcnn, recorder, seed)
+    trainer.fit(train_loader, validation_loader, epochs, coco_eval_frequency=coco_eval_frequency)
 
 
 def build_arg_parser() -> ArgumentParser:
@@ -241,21 +249,24 @@ def build_arg_parser() -> ArgumentParser:
         "--preprocess",
         action="store_true",
         help="Whether to preprocess the dataset or not",
-        default=False,
     )
 
     parser.add_argument(
         "--augment",
         action="store_true",
         help="Whether to augment the dataset or not",
-        default=False,
     )
 
     parser.add_argument(
         "--gpu",
         action="store_true",
         help="Whether to use GPU or not",
-        default=True,
+    )
+
+    parser.add_argument(
+        "--continue",
+        action="store_true",
+        help="Whether to continue training or not",
     )
 
     return parser
