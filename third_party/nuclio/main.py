@@ -37,7 +37,7 @@ def init_context(context):
 
 def read_categories():
     categories = COCOAnnotations.load_file(file_path=CATEGORIES_FILEPATH).get("categories")
-    return {str(category["id"]): category["name"] for category in categories}
+    return {str(category["id"] - 1): category["name"] for category in categories}
 
 
 def handler(context: Context, event: Event) -> Context.Response:
@@ -75,9 +75,3 @@ def handler(context: Context, event: Event) -> Context.Response:
         content_type="application/json",
         status_code=200,
     )
-
-
-if __name__ == "__main__":
-    context = Context()
-    init_context(context)
-    response = handler(context, Event("/home/joaoherrera/data/rugae/manual/images/IMG_7282_cel.jpg", 0.5))
