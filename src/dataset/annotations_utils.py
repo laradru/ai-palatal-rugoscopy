@@ -5,6 +5,7 @@
 import itertools
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
 
 
@@ -69,3 +70,25 @@ def xywh_to_xyxy(bbox: List) -> List:
     y2 = y + h
 
     return [x, y, x2, y2]
+
+
+def really_agnostic_segmentation_nms(masks: List[np.ndarray], scores: List[float], threshold: float) -> List[int]:
+    masks_list = masks
+    score_list = scores
+
+    sorted_args = np.argsort(score_list)[::-1]
+    to_remove = set()
+
+    for i in range(len(sorted_args) - 1):
+        if i in to_remove:
+            continue
+
+        highest_score_id = sorted_args[i]
+        mask_x = masks_list[highest_score_id]
+
+        intersections = [np.logical_and(mask_x, masks_list[j]).sum() for j in sorted_args[i + 1 :]]
+        unions = [np.logical_or(mask_x, masks_list[j]).sum() for j in sorted_args[i + 1 :]]
+        ious = np.divide(intersections, unions)
+        to_remove.update(sorted_args[np.where(ious >= threshold)[0] + i + 1])
+
+    return list(set(sorted_args) - to_remove)

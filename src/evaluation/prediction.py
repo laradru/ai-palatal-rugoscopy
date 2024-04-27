@@ -4,10 +4,10 @@ from typing import Dict, List, Tuple
 import numpy as np
 import torch
 import torchvision.transforms as T
-from torchvision.ops.boxes import nms
 
 from src.architectures.arch_base import ArchBase
 from src.architectures.segmenter_maskrcnn import MaskRCNNSegmenter
+from src.dataset.annotations_utils import really_agnostic_segmentation_nms
 from src.dataset.composer import OrderedCompose
 
 
@@ -90,23 +90,23 @@ class MaskRCNNPrediction(BasePrediction):
 
         masks, labels, scores = pred["masks"], pred["labels"], pred["scores"]
 
+        masks = masks.detach().cpu().numpy().squeeze(1)
+        labels = labels.detach().cpu().numpy()
+        scores = scores.detach().cpu().numpy()
+
         # Apply nms algorithm
-        valid_items = nms(pred["boxes"], scores, nms_threshold)
+        valid_items = really_agnostic_segmentation_nms(masks, scores, nms_threshold)
         masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
 
         # Filter results by confidence score
         valid_items = scores >= confidence_threshold
         masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
 
-        masks = masks.detach().cpu().numpy().squeeze(1)
-        labels = labels.detach().cpu().tolist()
-        scores = scores.detach().cpu().tolist()
-
         masks[masks >= segmentation_threshold] = 1
         masks[masks < segmentation_threshold] = 0
         masks = masks.astype(np.uint8)
 
-        return masks, labels, scores
+        return masks, labels.tolist(), scores.tolist()
 
     def predict_image(
         self,
