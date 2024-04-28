@@ -12,6 +12,9 @@ check_parameters() {
     # Check if all mandatory parameters are provided
     if [[ -z "$FROM" || -z "$TO" || -z "$IN" ]]; then
         echo "Error: Missing mandatory parameters. Please provide --from, --to, and --in."
+        echo "$FROM"
+        echo "$TO"
+        echo "$IN"
         exit 1
     fi
 
@@ -46,12 +49,6 @@ convert_from_to() {
     echo "Conversion completed."
 }
 
-# Check dependencies
-check_dependencies
-
-# Check parameters
-check_parameters
-
 # Parse command line parameters
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -63,6 +60,12 @@ while [[ "$#" -gt 0 ]]; do
     esac
     shift
 done
+
+# Check dependencies
+check_dependencies
+
+# Check parameters
+check_parameters
 
 # Perform conversion
 convert_from_to "$FROM" "$TO" "$IN" "$OUT"
