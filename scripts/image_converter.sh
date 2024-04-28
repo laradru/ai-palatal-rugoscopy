@@ -37,13 +37,23 @@ convert_from_to() {
     fi
 
     # Convert images
-    for file in "$IN"/*; do
-        if [[ -f "$file" ]]; then
-            filename=$(basename -- "$file")
-            extension="${filename##*.}"
-            filename="${filename%.*}"
-            convert "$file" "$OUT/$filename.$TO"
+    find "$IN" -type f -print0 | while IFS= read -r -d '' file; do
+        filename=$(basename -- "$file")
+        extension="${filename##*.}"
+
+        # Check if the file extension matches the specified FROM type
+        if [[ "$extension" != "$FROM" ]]; then
+            echo "Ignoring (not expected extension) ${filename}"
+            continue  # Skip this iteration
         fi
+        # Get relative path of file with respect to IN directory
+        relative_path=$(realpath --relative-to="$IN" "$file")
+
+        # Create corresponding directory structure in OUT directory
+        mkdir -p "$OUT/$(dirname "$relative_path")"
+
+        filename="${filename%.*}"
+        convert "$file" "$OUT/$(dirname "$relative_path")/$filename.$TO"
     done
 
     echo "Conversion completed."
