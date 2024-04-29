@@ -12,9 +12,6 @@ check_parameters() {
     # Check if all mandatory parameters are provided
     if [[ -z "$FROM" || -z "$TO" || -z "$IN" ]]; then
         echo "Error: Missing mandatory parameters. Please provide --from, --to, and --in."
-        echo "$FROM"
-        echo "$TO"
-        echo "$IN"
         exit 1
     fi
 
