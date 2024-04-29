@@ -55,7 +55,7 @@ def handler(context: Context, event: Event) -> Context.Response:
         image,
         confidence_threshold=threshold,
         segmentation_threshold=0.5,
-        nms_threshold=0.4,
+        nms_threshold=0.9,
     )
 
     resized_masks = []
@@ -80,4 +80,4 @@ def handler(context: Context, event: Event) -> Context.Response:
 if __name__ == "__main__":
     context = Context()
     init_context(context)
-    response = handler(context, Event("/home/joaoherrera/data/rugae/manual/images/IMG_7282_cel.jpg", 0.5))
+    response = handler(context, Event("/home/joaoherrera/data/rugae/calibracao/images/1019.JPG", 0.5))
