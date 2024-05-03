@@ -55,7 +55,7 @@ def handler(context: Context, event: Event) -> Context.Response:
         image,
         confidence_threshold=threshold,
         segmentation_threshold=0.5,
-        nms_threshold=0.4,
+        nms_threshold=0.9,
     )
 
     resized_masks = []

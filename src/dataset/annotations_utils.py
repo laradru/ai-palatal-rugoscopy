@@ -5,6 +5,7 @@
 import itertools
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
 
 
@@ -69,3 +70,34 @@ def xywh_to_xyxy(bbox: List) -> List:
     y2 = y + h
 
     return [x, y, x2, y2]
+
+
+def really_agnostic_segmentation_nms(masks: List[np.ndarray], scores: List[float], threshold: float) -> List[int]:
+    """Perform a custom version of non-maximum suppression algorithm, where segmentation is the main criteria.
+    Also, instead of computing the Intersection over Union (IoU), we compare the area of the masks.
+
+    Args:
+        masks (List[np.ndarray]): A list of numpy arrays representing the masks.
+        scores (List[float]): A list of floats representing the scores of the masks.
+        threshold (float): A float value representing the threshold for intersection over union (IoU) between masks.
+
+    Returns:
+        List[int]: A list of integers representing the indices of the remaining masks after suppression.
+    """
+
+    sorted_args = np.argsort(scores)[::-1]
+    to_remove = set()
+
+    for i in range(len(sorted_args) - 1):
+        if i in to_remove:
+            continue
+
+        mask_x = masks[sorted_args[i]]
+        mask_x_area = mask_x.sum()
+
+        intersections = [np.logical_and(mask_x, masks[j]).sum() for j in sorted_args[i + 1 :]]
+        min_area = [min(mask_x_area, masks[j].sum()) for j in sorted_args[i + 1 :]]
+        ious = np.divide(intersections, min_area)
+
+        to_remove.update(sorted_args[np.where(ious >= threshold)[0] + (i + 1)])
+    return list(set(sorted_args) - to_remove)
