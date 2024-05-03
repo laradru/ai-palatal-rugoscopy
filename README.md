@@ -21,6 +21,15 @@ Where:
 
 - DATA_PATH is the path to a folder containing the dataset (images).
 
+## Image convertion script
+
+There's a script that might be helpful if you need to convert images. In our case, from HEIC to something else that CVAT supports. 
+
+Use it as such:
+
+```shell
+./scripts/image_converter.sh --from heic --to jpg --in /path/to/input/directory [--out /path/to/output/directory]
+```
 
 ## Dataset Preprocessing
 
