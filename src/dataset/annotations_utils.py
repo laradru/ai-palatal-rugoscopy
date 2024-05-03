@@ -74,7 +74,7 @@ def xywh_to_xyxy(bbox: List) -> List:
 
 def really_agnostic_segmentation_nms(masks: List[np.ndarray], scores: List[float], threshold: float) -> List[int]:
     """Perform a custom version of non-maximum suppression algorithm, where segmentation is the main criteria.
-    Also, instead of computing the IoU, we compare the area of the masks.
+    Also, instead of computing the Intersection over Union (IoU), we compare the area of the masks.
 
     Args:
         masks (List[np.ndarray]): A list of numpy arrays representing the masks.
