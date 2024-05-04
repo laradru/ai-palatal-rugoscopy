@@ -21,7 +21,7 @@ Where:
 
 - DATA_PATH is the path to a folder containing the dataset (images).
 
-## Image convertion script
+## Image conversion script
 
 There's a script that might be helpful if you need to convert images. In our case, from HEIC to something else that CVAT supports. 
 
@@ -29,6 +29,15 @@ Use it as such:
 
 ```shell
 ./scripts/image_converter.sh --from heic --to jpg --in /path/to/input/directory [--out /path/to/output/directory]
+```
+
+## Annotations info reader
+
+There's also a script to read info from an annotation file (TODO add format of the file) and provide useful information, 
+like biggest and smallest annotation (area), a CSV of annotation info or details about an image file.
+
+```shell
+python3 ./scripts/read_annotation_info.py ./data/manual/annotations/instances_default.json --summary --image_info 44 --image_info 687
 ```
 
 ## Dataset Preprocessing
