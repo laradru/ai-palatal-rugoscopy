@@ -3,6 +3,7 @@ import io
 import json
 
 import cv2
+import cv2.typing
 import numpy as np
 from interfaces import Context, Event
 from PIL import Image
@@ -59,10 +60,20 @@ def handler(context: Context, event: Event) -> Context.Response:
     )
 
     resized_masks = []
+    discarded_resized_masks = []
     for i in range(len(predictions["masks"])):
         mask = predictions["masks"][i]
         mask = cv2.resize(mask, (cols, rows), interpolation=cv2.INTER_CUBIC)
-        resized_masks.append(mask)
+        if too_small_to_care(mask, (cols, rows)):
+            discarded_resized_masks.append(mask)
+        else:
+            resized_masks.append(mask)
+
+    print(
+        f"total images: {len(predictions['masks'])}; "
+        f"considered: {len(resized_masks)}; "
+        f"discarded: {len(discarded_resized_masks)}"
+    )
 
     predictions["masks"] = resized_masks
     results = to_cvat(predictions, read_categories())
@@ -75,3 +86,10 @@ def handler(context: Context, event: Event) -> Context.Response:
         content_type="application/json",
         status_code=200,
     )
+
+
+def too_small_to_care(mask: cv2.typing.MatLike, size: tuple) -> bool:
+    image_area = size[0] * size[1]
+    mask_area = cv2.countNonZero(mask)
+    percentage = (mask_area / image_area) * 100
+    return percentage < 0.1
