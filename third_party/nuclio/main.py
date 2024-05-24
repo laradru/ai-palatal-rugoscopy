@@ -74,9 +74,3 @@ def handler(context: Context, event: Event) -> Context.Response:
 
     context.logger.info("Finished automatic annotation")
     return context.Response(body=json.dumps(results), headers={}, content_type="application/json", status_code=200)
-
-
-if __name__ == "__main__":
-    context = Context()
-    init_context(context)
-    response = handler(context, Event("/home/joaoherrera/data/rugae/calibracao/images/10.jpg", 0.5))
