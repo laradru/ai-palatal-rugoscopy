@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+from typing import List
 
 import cv2
 import cv2.typing
@@ -59,10 +60,11 @@ def handler(context: Context, event: Event) -> Context.Response:
         nms_threshold=0.9,
     )
 
+    single_masks = filter_to_single_blob(predictions["masks"])
     resized_masks = []
     discarded_resized_masks = []
-    for i in range(len(predictions["masks"])):
-        mask = predictions["masks"][i]
+    for i in range(len(single_masks)):
+        mask = single_masks[i]
         mask = cv2.resize(mask, (cols, rows), interpolation=cv2.INTER_CUBIC)
         if too_small_to_care(mask, (cols, rows)):
             discarded_resized_masks.append(mask)
@@ -70,7 +72,7 @@ def handler(context: Context, event: Event) -> Context.Response:
             resized_masks.append(mask)
 
     print(
-        f"total images: {len(predictions['masks'])}; "
+        f"total images: {len(single_masks)}; "
         f"considered: {len(resized_masks)}; "
         f"discarded: {len(discarded_resized_masks)}"
     )
@@ -89,7 +91,46 @@ def handler(context: Context, event: Event) -> Context.Response:
 
 
 def too_small_to_care(mask: cv2.typing.MatLike, size: tuple) -> bool:
+    """
+    Check if the given mask is too small to be considered for further processing.
+
+    Parameters:
+        mask (numpy.ndarray): The mask to be evaluated.
+        image_area (int): The total area of the original image.
+
+    Returns:
+        bool: True if the mask covers less than 0.05% of the image area, False otherwise.
+    """
+
     image_area = size[0] * size[1]
     mask_area = cv2.countNonZero(mask)
     percentage = (mask_area / image_area) * 100
-    return percentage < 0.1
+    return percentage < 0.05
+
+
+def filter_to_single_blob(masks: List[np.ndarray]) -> List[np.ndarray]:
+    """Filter out tiny blobs from a list of masks. Note: The function assumes that the input masks are binary images,
+    where non-zero values represent object pixels and zero values represent background pixels.
+
+    Args:
+        masks (List[np.ndarray]): A list of numpy arrays representing the masks.
+
+    Returns:
+        List[np.ndarray]: A list of numpy arrays representing the masks with tiny blobs filtered out.
+    """
+
+    # Due to multiple probability values (pixel level) in the segmentation map, some segmentation might
+    # turn to small blobs. However, the better the Mask R-CNN model, the lower the probability of these blobs appear.
+    # Here we filter out the tiny blobs, since the first experiments suggest that Mask R-CNN still needs improvement.
+
+    for i in range(len(masks)):
+        mask = masks[i]
+        n_labels, cc_map = cv2.connectedComponents(mask.astype(np.uint8))
+
+        if n_labels > 2:  # 0 is the background
+            blob_sizes = [np.sum(cc_map == i) for i in range(1, n_labels)]
+            bigger_blob = np.argmax(blob_sizes) + 1
+            mask[cc_map != bigger_blob] = 0
+            masks[i] = mask
+
+    return masks
