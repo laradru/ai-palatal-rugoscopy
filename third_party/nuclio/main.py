@@ -20,8 +20,7 @@ DEVICE = "cuda:0"
 BATCH_SIZE = 1
 CONFIDENCE_THRESHOLD = 0.0
 SEGMENTATION_THRESHOLD = 0.5
-NMS_THRESHOLD = 0.5
-TINY_BLOBS_THRESHOLD = 0.7
+NMS_THRESHOLD = 0.9
 
 
 def init_context(context):
@@ -60,7 +59,6 @@ def handler(context: Context, event: Event) -> Context.Response:
         confidence_threshold=CONFIDENCE_THRESHOLD,
         segmentation_threshold=SEGMENTATION_THRESHOLD,
         nms_threshold=NMS_THRESHOLD,
-        tiny_blobs_threshold=TINY_BLOBS_THRESHOLD,
     )
 
     resized_masks = []

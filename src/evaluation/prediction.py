@@ -7,7 +7,7 @@ import torchvision.transforms as T
 
 from src.architectures.arch_base import ArchBase
 from src.architectures.segmenter_maskrcnn import MaskRCNNSegmenter
-from src.dataset.annotations_utils import filter_tiny_blobs, filter_to_single_blob, really_agnostic_segmentation_nms
+from src.dataset.annotations_utils import filter_to_single_blob, really_agnostic_segmentation_nms
 from src.dataset.composer import OrderedCompose
 
 
@@ -75,7 +75,6 @@ class MaskRCNNPrediction(BasePrediction):
         confidence_threshold: float = 0.5,
         segmentation_threshold: float = 0.5,
         nms_threshold: float = 0.3,
-        tiny_blobs_threshold: float = 0.5,
     ) -> Tuple[List, List, List]:
         """Generate postprocessed masks, labels, and scores from the prediction.
 
@@ -95,15 +94,6 @@ class MaskRCNNPrediction(BasePrediction):
         labels = labels.detach().cpu().numpy()
         scores = scores.detach().cpu().numpy()
 
-        masks[masks >= segmentation_threshold] = 1
-        masks[masks < segmentation_threshold] = 0
-        masks = masks.astype(np.uint8)
-        masks = filter_to_single_blob(masks)
-
-        # Filter tiny blobs
-        valid_items = filter_tiny_blobs(masks, tiny_blobs_threshold=tiny_blobs_threshold, norm_factor=1024)
-        masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
-
         # Apply nms algorithm
         valid_items = really_agnostic_segmentation_nms(masks, scores, nms_threshold)
         masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
@@ -111,6 +101,11 @@ class MaskRCNNPrediction(BasePrediction):
         # Filter results by confidence score
         valid_items = scores >= confidence_threshold
         masks, labels, scores = masks[valid_items], labels[valid_items], scores[valid_items]
+
+        masks[masks >= segmentation_threshold] = 1
+        masks[masks < segmentation_threshold] = 0
+        masks = masks.astype(np.uint8)
+        masks = filter_to_single_blob(masks)
 
         return masks, labels.tolist(), scores.tolist()
 
@@ -120,7 +115,6 @@ class MaskRCNNPrediction(BasePrediction):
         confidence_threshold: float = 0.5,
         segmentation_threshold: float = 0.5,
         nms_threshold: float = 0.3,
-        tiny_blobs_threshold: float = 0.5,
     ) -> Dict:
         """Predicts the labels and masks for an input image using the given threshold.
 
@@ -144,7 +138,6 @@ class MaskRCNNPrediction(BasePrediction):
             confidence_threshold=confidence_threshold,
             segmentation_threshold=segmentation_threshold,
             nms_threshold=nms_threshold,
-            tiny_blobs_threshold=tiny_blobs_threshold,
         )
 
         return {"masks": masks, "labels": labels, "scores": scores}

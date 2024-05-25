@@ -124,7 +124,7 @@ def filter_to_single_blob(masks: List[np.ndarray]) -> List[np.ndarray]:
         n_labels, cc_map = cv2.connectedComponents(mask.astype(np.uint8))
 
         if n_labels > 2:  # 0 is the background
-            blob_sizes = [np.sum(cc_map == i) for i in range(1, n_labels)]
+            blob_sizes = [np.sum(cc_map == j) for j in range(1, n_labels)]
             bigger_blob = np.argmax(blob_sizes) + 1
             mask[cc_map != bigger_blob] = 0
             masks[i] = mask
