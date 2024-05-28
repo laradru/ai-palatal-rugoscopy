@@ -9,6 +9,8 @@ import cv2
 import numpy as np
 from pycocotools import mask as coco_mask
 
+from src.dataset.annotations_utils import smooth_annotations
+
 
 def read_image(image_path: str, read_mode: int = cv2.IMREAD_COLOR, channel_first: bool = False) -> np.ndarray:
     """Reads an image from the given path.
@@ -318,6 +320,7 @@ def to_cvat(predictions: Dict, categories: Dict[str, str]) -> List[Dict]:
             label = str(label)
             __, segmentation = extract_bbox_segmentation(mask)
             segmentation = list(map(float, segmentation))
+            segmentation = smooth_annotations(segmentation)
             res.append({"confidence": score, "label": categories[label], "points": segmentation, "type": "polygon"})
 
     return res

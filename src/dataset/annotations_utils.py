@@ -8,6 +8,7 @@ from typing import Dict, List
 import cv2
 import numpy as np
 import pandas as pd
+from scipy.ndimage import gaussian_filter1d
 
 
 def to_dataframe(dictionary: Dict) -> pd.DataFrame:
@@ -104,6 +105,36 @@ def really_agnostic_segmentation_nms(masks: List[np.ndarray], scores: List[float
     return list(set(sorted_args) - to_remove)
 
 
+def smooth_annotations(segmentation: List[int], gaussian_sigma: float = 3) -> List[int]:
+    """Smooth the given segmentation by applying a Gaussian filter to the x and y coordinates.
+
+    Args:
+        segmentation (List[int]): The segmentation to be smoothed. It should be a list of integers representing
+        the x and y coordinates.
+        gaussian_sigma (float, optional): The standard deviation of the Gaussian filter. Defaults to 3.
+
+    Returns:
+        List[int]: The smoothed segmentation. It is a new list of integers representing the x and y coordinates.
+    """
+
+    xs, ys = segmentation[0::2], segmentation[1::2]
+
+    # smooth coordinates
+    xs = gaussian_filter1d(xs, sigma=gaussian_sigma)
+    ys = gaussian_filter1d(ys, sigma=gaussian_sigma)
+
+    # roll coordinates so extremities can be smoothed as well.
+    xs = gaussian_filter1d(np.roll(xs, 5), sigma=gaussian_sigma)
+    ys = gaussian_filter1d(np.roll(ys, 5), sigma=gaussian_sigma)
+
+    # create new segmentation
+    new_annotation = [0] * len(xs) * 2
+    new_annotation[0::2] = xs
+    new_annotation[1::2] = ys
+
+    return new_annotation
+
+  
 def filter_to_single_blob(masks: List[np.ndarray]) -> List[np.ndarray]:
     """Filter out tiny blobs from a list of masks. Note: The function assumes that the input masks are binary images,
     where non-zero values represent object pixels and zero values represent background pixels.
