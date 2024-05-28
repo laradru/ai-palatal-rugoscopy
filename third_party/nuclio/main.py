@@ -18,6 +18,9 @@ MODEL_PATH = "checkpoint.pth"
 CATEGORIES_FILEPATH = "categories.json"
 DEVICE = "cuda:0"
 BATCH_SIZE = 1
+CONFIDENCE_THRESHOLD = 0.0
+SEGMENTATION_THRESHOLD = 0.5
+NMS_THRESHOLD = 0.9
 
 
 def init_context(context):
@@ -46,16 +49,16 @@ def handler(context: Context, event: Event) -> Context.Response:
     data = event.body
     buffer = io.BytesIO(base64.b64decode(data["image"]))  # Image to be annotated.
     predictor: MaskRCNNPrediction = context.user_data.model
-    threshold = float(data.get("threshold", 0.0))  # Defined on CVAT interface.
 
+    # Transform image into PIL Image, which is a numpy array.
     image = np.array(Image.open(buffer))
     rows, cols = image.shape[:2]
 
     predictions = predictor.predict_image(
         image,
-        confidence_threshold=threshold,
-        segmentation_threshold=0.5,
-        nms_threshold=0.9,
+        confidence_threshold=CONFIDENCE_THRESHOLD,
+        segmentation_threshold=SEGMENTATION_THRESHOLD,
+        nms_threshold=NMS_THRESHOLD,
     )
 
     resized_masks = []
@@ -68,10 +71,4 @@ def handler(context: Context, event: Event) -> Context.Response:
     results = to_cvat(predictions, read_categories())
 
     context.logger.info("Finished automatic annotation")
-
-    return context.Response(
-        body=json.dumps(results),
-        headers={},
-        content_type="application/json",
-        status_code=200,
-    )
+    return context.Response(body=json.dumps(results), headers={}, content_type="application/json", status_code=200)

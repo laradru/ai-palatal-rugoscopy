@@ -7,7 +7,7 @@ import torchvision.transforms as T
 
 from src.architectures.arch_base import ArchBase
 from src.architectures.segmenter_maskrcnn import MaskRCNNSegmenter
-from src.dataset.annotations_utils import really_agnostic_segmentation_nms
+from src.dataset.annotations_utils import filter_to_single_blob, really_agnostic_segmentation_nms
 from src.dataset.composer import OrderedCompose
 
 
@@ -105,6 +105,7 @@ class MaskRCNNPrediction(BasePrediction):
         masks[masks >= segmentation_threshold] = 1
         masks[masks < segmentation_threshold] = 0
         masks = masks.astype(np.uint8)
+        masks = filter_to_single_blob(masks)
 
         return masks, labels.tolist(), scores.tolist()
 
@@ -122,6 +123,7 @@ class MaskRCNNPrediction(BasePrediction):
             confidence_threshold (float, optional): Minimum confidence threshold for predictions. Defaults to 0.5.
             segmentation_threshold (float, optional): Minimum segmentation threshold for predictions. Defaults to 0.5.
             nms_threshold (float, optional): The NMS threshold. Defaults to 0.3.
+            tiny_blobs_threshold (float, optional): The threshold for filtering tiny blobs. Defaults to 0.5.
 
         Returns:
             Dict: A dictionary containing segmented masks for each category.

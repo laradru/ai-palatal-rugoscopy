@@ -5,6 +5,7 @@
 import itertools
 from typing import Dict, List
 
+import cv2
 import numpy as np
 import pandas as pd
 
@@ -101,3 +102,52 @@ def really_agnostic_segmentation_nms(masks: List[np.ndarray], scores: List[float
 
         to_remove.update(sorted_args[np.where(ious >= threshold)[0] + (i + 1)])
     return list(set(sorted_args) - to_remove)
+
+
+def filter_to_single_blob(masks: List[np.ndarray]) -> List[np.ndarray]:
+    """Filter out tiny blobs from a list of masks. Note: The function assumes that the input masks are binary images,
+    where non-zero values represent object pixels and zero values represent background pixels.
+
+    Args:
+        masks (List[np.ndarray]): A list of numpy arrays representing the masks.
+
+    Returns:
+        List[np.ndarray]: A list of numpy arrays representing the masks with tiny blobs filtered out.
+    """
+
+    # Due to multiple probability values (pixel level) in the segmentation map, some segmentation might
+    # turn to small blobs. However, the better the Mask R-CNN model, the lower the probability of these blobs appear.
+    # Here we filter out the tiny blobs, since the first experiments suggest that Mask R-CNN still needs improvement.
+
+    for i in range(len(masks)):
+        mask = masks[i]
+        n_labels, cc_map = cv2.connectedComponents(mask.astype(np.uint8))
+
+        if n_labels > 2:  # 0 is the background
+            blob_sizes = [np.sum(cc_map == j) for j in range(1, n_labels)]
+            bigger_blob = np.argmax(blob_sizes) + 1
+            mask[cc_map != bigger_blob] = 0
+            masks[i] = mask
+
+    return masks
+
+
+def filter_tiny_blobs(masks: List[np.ndarray], tiny_blobs_threshold: int = 1, norm_factor=1024) -> List[int]:
+    """Filter out tiny blobs from a list of masks.
+
+    Args:
+        masks (List[np.ndarray]): A list of numpy arrays representing the masks.
+        tiny_blobs_threshold (int, optional): The minimum size of a blob to be considered valid. Defaults to 1.
+        norm_factor (int, optional): The normalization factor to scale the blob size. Defaults to 1024.
+
+    Returns:
+        List[int]: A list of indices representing the valid masks.
+    """
+
+    valid_masks = []
+
+    for i, mask in enumerate(masks):
+        if np.sum(mask) / norm_factor > tiny_blobs_threshold:
+            valid_masks.append(i)
+
+    return valid_masks
